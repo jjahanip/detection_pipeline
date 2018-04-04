@@ -1,4 +1,6 @@
 import numpy as np
+import matplotlib.pylab as plt
+import matplotlib.patches as patches
 
 
 def imadjust(img, tol=[0.01, 0.99]):
@@ -26,3 +28,17 @@ def imadjust(img, tol=[0.01, 0.99]):
     img_out = np.array([[lut[i] for i in row] for row in img])  # convert input image values based on conversion list
 
     return img_out
+
+
+def visualize_bbxs(image, centers=None, bbxs=None):
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.imshow(np.divide(image, 256).astype(np.uint8))
+    if centers is not None:
+        ax.plot(centers[:, 0], centers[:, 1], 'b.')
+    if bbxs is not None:
+        for idx in range(bbxs.shape[0]):
+            ax.add_patch(patches.Rectangle((bbxs[idx, 0], bbxs[idx, 1]),
+                                            bbxs[idx, 2], bbxs[idx, 3],
+                                           edgecolor="blue", fill=False))
