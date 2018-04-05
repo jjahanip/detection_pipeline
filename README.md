@@ -9,7 +9,7 @@
 4) train
 ```bash
 python train.py \
---logtostderr
+--logtostderr \
 --train_dir=/train \
 --pipeline_config_path=/train/faster_rcnn_inception_resnet_v2_atrous_coco.config
 ```
@@ -25,6 +25,8 @@ Add object_detection and slim folders to PYTHONPATH
 # From tensorflow/models/research/
 protoc object_detection/protos/*.proto --python_out=.
 ```
+
+for tf <1.5 go to commit 196d173 (this is compatible with tf 1.4.1)
 
 ### Probable error:
 
