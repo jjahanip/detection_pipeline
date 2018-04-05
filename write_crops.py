@@ -75,6 +75,10 @@ def write_crops(save_folder, image_filenames, centers_filename, crop_size, adjus
             crop_bbxs = GenerateBBoxfromSeeds(crop_img[:, :, 0], crop_centers)
 
             # remove bbxs with width <10 or height<10
+            crop_bbxs = crop_bbxs[(crop_bbxs[:, 0] + crop_bbxs[:, 2] > crop_width) &
+                                  (crop_bbxs[:, 1] + crop_bbxs[:, 3] > crop_height)]
+
+            # remove bbxs fall out of image
             crop_bbxs = crop_bbxs[(crop_bbxs[:, 2] > 10) & (crop_bbxs[:, 3] > 10)]
 
             # write bounding boxes in xml file
@@ -96,4 +100,4 @@ if __name__ == '__main__':
 
     centers_fname = check_path('D:\\Jahandar\\Lab\\images\\crops_for_badri_proposal\\LiVPa\\centers.txt')
 
-    write_crops(input_fnames, centers_fname, crop_size=crop_size, adjust_hist=False)
+    write_crops(save_folder, input_fnames, centers_fname, crop_size=crop_size, adjust_hist=True)

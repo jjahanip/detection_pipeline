@@ -102,5 +102,7 @@ ENV/
 # pycharm
 .idea
 
-# data folder
-data*
+# project folders
+pretrained_models/*
+data/*
+train/*
