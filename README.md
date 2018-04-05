@@ -11,8 +11,9 @@
 python train.py \
 --logtostderr
 --train_dir=/train \
---python_out--pipeline_config_path=/train/faster_rcnn_inception_resnet_v2_atrous_coco.config
+--pipeline_config_path=/train/faster_rcnn_inception_resnet_v2_atrous_coco.config
 ```
+
 ### Dependencies
 
 * Tensorflow
