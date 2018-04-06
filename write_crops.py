@@ -1,5 +1,7 @@
 import os
 import sys
+import argparse
+
 import numpy as np
 import skimage.io
 import warnings
@@ -11,7 +13,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
 
-def write_crops(save_folder, image_filenames, centers_filename, crop_size, adjust_hist=False):
+def write_crops(save_folder, image_filenames, centers_filename, crop_size=[300, 300], adjust_hist=False, vis_idx=0):
 
     # crop width and height
     crop_width, crop_height = crop_size
@@ -49,6 +51,7 @@ def write_crops(save_folder, image_filenames, centers_filename, crop_size, adjus
     centers = centers[:, 1:3].astype(int) - 1                           # extract centers
 
     # for each crop:
+    crop_idx = 0
     for i in range(0, img_rows, crop_height):
         for j in range(0, img_cols, crop_width):
             # extract centers of the cells in the crop
@@ -63,7 +66,7 @@ def write_crops(save_folder, image_filenames, centers_filename, crop_size, adjus
 
             # crop the image
             crop_img = image[i:crop_height + i, j:crop_width + j]   # create crop image
-            if crop_img.shape[:2][::-1] != crop_size:
+            if crop_img.shape[:2][::-1] != tuple(crop_size):
                 continue
 
             crop_name = str(i) + '_' + str(j) + '.jpeg'             # filename contains x & y coords of top left corner
@@ -88,17 +91,55 @@ def write_crops(save_folder, image_filenames, centers_filename, crop_size, adjus
             write_xml(os.path.join(save_folder, 'xmls', xml_name), crop_bbxs, labels, image_size=crop_img.shape)
 
             # visualize bbxs
-            # visualize_bbxs(crop_img, centers=crop_centers, bbxs=crop_bbxs)
+            if crop_idx < vis_idx:
+                    visualize_bbxs(crop_img, centers=crop_centers, bbxs=crop_bbxs)
+
+            crop_idx = crop_idx + 1
+
+
+def main():
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--input_dir', type=str, default='/data/input_imgs', help='path to the directory of input images and centers file')
+    parser.add_argument('--crop_size', type=str, default='300,300', help='size of the cropped image e.g. 300,300')
+    parser.add_argument('--save_dir', type=str, default='/data', help='path to the folders of new images and xml files')
+    parser.add_argument('--adjust_image', action='store_true',  help='adjust histogram of image')
+    parser.add_argument('--visualize', type=int, default=0, help='visualize n sample images with bbxs')
+    args = parser.parse_args()
+
+    # read input
+    input_fnames = []
+    for file in os.listdir(args.input_dir):
+        file_name, file_extension = os.path.splitext(file)
+        if file_extension in ['.jpeg', '.jpg', '.bmp', '.tif', '.tiff', '.png']:
+            input_fnames.append(check_path(os.path.join(args.input_dir, file)))
+        if file_extension == '.txt':
+            centers_fname = check_path(os.path.join(args.input_dir, file))
+    assert len(input_fnames) <= 3, ('Provide no more than 3 images')
+
+    # read centers file
+    # centers_fname = args.centers_file
+
+    # read crop size
+    crop_size = list(map(int, args.crop_size.split(',')))
+
+    # read path to save imgs and xmls folders
+    save_folder = check_path(args.save_dir)
+
+    # read Boolean to adjust the image histogram
+    adjust_image = args.adjust_image
+
+    # read number of images to be visualized
+    vis_idx = args.visualize
+
+
+
+    write_crops(save_folder, input_fnames, centers_fname, crop_size=crop_size, adjust_hist=adjust_image, vis_idx=vis_idx)
+    print('Successfully created the cropped images and corresponding xml files in:\n {}\n{}'
+          .format(args.save_dir+'/imgs', args.save_dir+'/xmls'))
 
 
 if __name__ == '__main__':
-    crop_size = (300, 300)
-    save_folder = os.path.join(os.getcwd(), 'data', 'LiVPa')
 
-    input_fnames = []
-    input_fnames.append(check_path('D:\\Jahandar\\Lab\\images\\crops_for_badri_proposal\\LiVPa\\ARBc_#4_Li+VPA_37C_4110_C10_IlluminationCorrected_stitched.tif'))
-    input_fnames.append(check_path('D:\\Jahandar\\Lab\\images\\crops_for_badri_proposal\\LiVPa\\ARBc_#4_Li+VPA_37C_4110_C7_IlluminationCorrected_stitched.tif'))
-
-    centers_fname = check_path('D:\\Jahandar\\Lab\\images\\crops_for_badri_proposal\\LiVPa\\centers.txt')
-
-    write_crops(save_folder, input_fnames, centers_fname, crop_size=crop_size, adjust_hist=True)
+    main()
+    print()

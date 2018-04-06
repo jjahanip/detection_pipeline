@@ -22,9 +22,8 @@ from collections import namedtuple, OrderedDict
 from lib.ops import xml_to_csv, check_path
 
 flags = tf.app.flags
-flags.DEFINE_string('csv_input', 'data\\LiVPa\\labels.csv', 'Path to the CSV input')
-flags.DEFINE_string('output_path', 'data\\LiVPa\\train.record', 'Path to output TFRecord')
-flags.DEFINE_string('img_dir', 'data\\LiVPa\\imgs', 'Path to images directory')
+flags.DEFINE_string('input_dir', 'data', 'Path to parent folder containing "imgs" and "xmls" directories')
+flags.DEFINE_string('output_path', 'data/train.record', 'Path to output TFRecord file')
 FLAGS = flags.FLAGS
 
 
@@ -85,17 +84,16 @@ def create_tf_example(group, path):
 def main(_):
 
     # generate csv file
-    xmls_path = 'D:\\Jahandar\\Lab\\research\\codes\\me\\detection_pipeline\\data\\LiVPa\\xmls\\'
-    xml_to_csv(xmls_path)
+    xmls_path = check_path(os.path.join(FLAGS.input_dir, 'xmls'))
+    csv_filename = xml_to_csv(xmls_path)
 
     # check paths for linux, windows compatibility
-    output_path = os.path.join(os.getcwd(), check_path(FLAGS.output_path))
-    img_dir = os.path.join(os.getcwd(), check_path(FLAGS.img_dir))
-    csv_input = os.path.join(os.getcwd(), check_path(FLAGS.csv_input))
+    output_path = check_path(FLAGS.output_path)
+    img_dir = check_path(os.path.join(FLAGS.input_dir, 'imgs'))
 
     # generate tfrecord file
     writer = tf.python_io.TFRecordWriter(output_path)
-    examples = pd.read_csv(csv_input)
+    examples = pd.read_csv(csv_filename)
     grouped = split(examples, 'filename')
     for group in grouped:
         tf_example = create_tf_example(group, img_dir)

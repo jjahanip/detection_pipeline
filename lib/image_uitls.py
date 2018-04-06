@@ -42,3 +42,4 @@ def visualize_bbxs(image, centers=None, bbxs=None):
             ax.add_patch(patches.Rectangle((bbxs[idx, 0], bbxs[idx, 1]),
                                             bbxs[idx, 2], bbxs[idx, 3],
                                            edgecolor="blue", fill=False))
+    plt.show()

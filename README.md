@@ -1,10 +1,28 @@
-## Pipeline:
+# detection_pipeline:
 
-1) create small crops from large image and centers -> write_crops.py
+detection_pipeline is a tool for cell detection.
 
-2) (optional) fix bounding boxes usign LabelImg
+# Pipeline:
 
-3) generate tfrecord file from xmls and imgs -> generate_tfrecord.py
+1) create small crops from large image and centers
+```bash
+python write_crops.py \
+--images_dir=data/input_data \
+--crop_size=300,300 \
+--save_dir=data \
+--adjust_image \
+--visualize=2
+```
+__NOTE__: use visualize if you want to see the first "n" crops to make sure everything is right.
+
+2) (optional) fix bounding boxes usign [LabelImg](https://github.com/tzutalin/labelImg)
+
+3) generate tfrecord file from xmls and imgs
+```bash
+python generate_tfrecord.py \ 
+--input_dir=data \
+--output_path=data/train.record
+```
 
 4) train
 ```bash

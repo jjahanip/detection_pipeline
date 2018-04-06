@@ -1,6 +1,5 @@
 import sys
 import os
-import glob
 import pandas as pd
 import xml.etree.ElementTree as ET
 
@@ -9,6 +8,9 @@ def check_path(loc):
     if sys.platform == "linux" or sys.platform == "linux2":
         locLinux = loc.replace("\\", "/")
         return locLinux
+    if sys.platform == "win32" or sys.platform == "win64":
+        locWin = loc.replace("/", '\\')
+        return locWin
     else:
         return loc
 
@@ -135,13 +137,13 @@ def xml_to_csv(path):
     '''
     Create cvs file for generating cvs file
     :param path: path/to/the/xmls
-    :return: None
+    :return: path to the saved file name
 
     Note: keep images in "imgs" folder and xml files in "xmls" folder in same folder
     '''
     xml_list = []
-    for xml_file in glob.glob(path + '*.xml'):
-        tree = ET.parse(xml_file)
+    for xml_file in os.listdir(path):
+        tree = ET.parse(os.path.join(path, xml_file))
         root = tree.getroot()
         for member in root.findall('object'):
             value = (root.find('filename').text,
@@ -157,6 +159,7 @@ def xml_to_csv(path):
     column_name = ['filename', 'width', 'height', 'class', 'xmin', 'ymin', 'xmax', 'ymax']
     xml_df = pd.DataFrame(xml_list, columns=column_name)
 
-    save_path = os.path.dirname(os.path.dirname(path))
+    save_path = os.path.dirname(path)
     xml_df.to_csv(os.path.join(save_path, 'labels.csv'), index=None)
 
+    return os.path.join(save_path, 'labels.csv')
