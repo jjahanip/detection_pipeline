@@ -4,7 +4,7 @@ detection_pipeline is a tool for cell detection.
 
 # Pipeline:
 
-1) create small crops from large image and centers
+1. Create small crops from large image and centers
 ```bash
 python write_crops.py \
 --images_dir=data/input_data \
@@ -13,61 +13,97 @@ python write_crops.py \
 --adjust_image \
 --visualize=2
 ```
-__NOTE__: use visualize if you want to see the first "n" crops to make sure everything is right.
+__NOTE__: Use visualize if you want to see the first "n" crops to make sure everything is right.
 
-2) (optional) fix bounding boxes usign [LabelImg](https://github.com/tzutalin/labelImg)
+2. (optional) Fix bounding boxes usign [LabelImg](https://github.com/tzutalin/labelImg)
 
-3) generate tfrecord file from xmls and imgs
-```bash
-python generate_tfrecord.py \ 
---input_dir=data \
---output_path=data/train.record
-```
+3. Generate tfrecord file from xmls and imgs
+  ```bash
+  python generate_tfrecord.py \ 
+  --input_dir=data \
+  --output_path=data/train.record
+  ```
+  Create a label map for mapping classes to unique IDs. For example create a ```nucleus_map.pbtxt``` file inside ```data`` folder and add following lines:
+  ```txt
+  item {
+  name: "Nucleus"
+  id: 1
+  display_name: "Nucleus"
+  }
+  ```
 
-4) train
-```bash
-python train.py \
---logtostderr \
---train_dir=/train \
---pipeline_config_path=/train/faster_rcnn_inception_resnet_v2_atrous_coco.config
-```
+4. Train: 
+  1. Locate your object_detection folder and copy the train.py file to the ```detection_pipeline``` directory.
+
+  2. Download your pretrained model from [here](https://github.com/tensorflow/models/blob/master/research/object_detection/g3doc/detection_model_zoo.md) and save it in folder ```pretrained_models ```.
+
+  3. create a __training__ folder to save the training model and parameters. Inside the __training__ folder copy the .config file from ```/tensorflow/models/research/object_detection/samples/configs/```.
+  For example ```faster_rcnn_inception_resnet_v2_atrous_coco.config``` file.
+
+    edit the following lines:
+
+    ```txt
+    num_classes: 1
+    fine_tune_checkpoint: pretrained_models/faster_rcnn_inception_resnet_v2_atrous_coco_2018_01_28
+    input_path: data/train.record
+    label_map_path: data/nucleus_map.pbtxt
+    ```
+    and comment the evaluation lines:
+    ```txt
+    # eval_config: {
+    #   num_examples: 8000
+    #   # Note: The below line limits the evaluation process to 10 evaluations.
+    #   # Remove the below line to evaluate indefinitely.
+    #   max_evals: 10
+    # }
+    # 
+    # eval_input_reader: {
+    #   tf_record_input_reader {
+    #   input_path: "PATH_TO_BE_CONFIGURED/mscoco_val.record"
+    # }
+    # label_map_path: "PATH_TO_BE_CONFIGURED/mscoco_label_map.pbtxt"
+    # shuffle: false
+    # num_readers: 1
+    # }
+    ```
+  
+    Now you can train your model:
+    ```bash
+    python train.py \
+    --logtostderr \
+    --train_dir=training \
+    --pipeline_config_path=training/faster_rcnn_inception_resnet_v2_atrous_coco.config
+    ```
 
 ### Dependencies
 
 * Tensorflow
 * Object detection toolkit (download from [here](https://github.com/tensorflow/models) and install from [here](https://github.com/tensorflow/models/blob/master/research/object_detection/g3doc/installation.md))
 
-(__for windows__): Install protofub from [here](https://github.com/google/protobuf/releases)
-Add object_detection and slim folders to PYTHONPATH
-``` bash
+* * (__for windows__): Install protofub from [here](https://github.com/google/protobuf/releases).
+* * Add object_detection and slim folders to PYTHONPATH.
+
+    (__for Windows__):
+```bash
 # From tensorflow/models/research/
-protoc object_detection/protos/*.proto --python_out=.
+SET PYTHONPATH=%cd%;%cd%\slim
+```
+    (__for Linux and Mac__):
+```bash
+# From tensorflow/models/research/
+export PYTHONPATH=$PYTHONPATH:`pwd`:`pwd`/slim
 ```
 
-for tf <1.5 go to commit 196d173 (this is compatible with tf 1.4.1)
+
+### Probable Errors:
+* If your TensorFlow version is  < 1.5 you might have issues with object detection module. Go to commit 196d173 which is compatible with tf 1.4.1:
+```bash
+# from tensorflwo/models
+git checkout 196d173
+```
 
 
-### Prepare data for train:
-
- create a __train__ folder to save the train model and parameters. Inside the __train__ folder copy the .config file from /tensorflow/models/research/object_detection/samples/configs/
-
-For example for faster_rcnn_inception_resnet_v2_atrous_coco.config file: correct the following lines:
-
-num_classes: 1
-
-fine_tune_checkpoint: /path/to/downloded/pretrained/model/from/[here](https://github.com/tensorflow/models/blob/master/research/object_detection/g3doc/detection_model_zoo.md) (pretrained_models)
-
-input_path: /path/to/.record __file__ (__data__)
-
-label_map_path: /path/to/map/file/.pbtxt __file__ (__data__)
-
-
-
-
-
-### Probable error:
-
- * object_detection with tf > 1.5 has compatibility issue with python3.x. If you faced the following error:
+ * If your TensorFlow version is > 1.5 you might have compatibility issue with python3.x. If you faced the following error:
 ```bash
 ValueError: Tried to convert 't' to a tensor and failed. Error: Argument must be a dense tensor: range(0, 3) - got shape [3], but wanted [].
 ```
