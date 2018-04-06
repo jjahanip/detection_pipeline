@@ -75,11 +75,12 @@ def write_crops(save_folder, image_filenames, centers_filename, crop_size, adjus
             crop_bbxs = GenerateBBoxfromSeeds(crop_img[:, :, 0], crop_centers)
 
             # remove bbxs with width <10 or height<10
-            crop_bbxs = crop_bbxs[(crop_bbxs[:, 0] + crop_bbxs[:, 2] > crop_width) &
-                                  (crop_bbxs[:, 1] + crop_bbxs[:, 3] > crop_height)]
+            crop_bbxs = crop_bbxs[(crop_bbxs[:, 2] > 10) & (crop_bbxs[:, 3] > 10)]
 
             # remove bbxs fall out of image
-            crop_bbxs = crop_bbxs[(crop_bbxs[:, 2] > 10) & (crop_bbxs[:, 3] > 10)]
+            crop_bbxs = crop_bbxs[(crop_bbxs[:, 0] >= 0) & (crop_bbxs[:, 1] >= 0) &
+                                  (crop_bbxs[:, 0] + crop_bbxs[:, 2] < crop_width) &
+                                  (crop_bbxs[:, 1] + crop_bbxs[:, 3] < crop_height)]
 
             # write bounding boxes in xml file
             xml_name = str(i) + '_' + str(j) + '.xml'  # filename contains x & y coords of top left corner

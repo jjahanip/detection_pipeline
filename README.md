@@ -28,14 +28,6 @@ protoc object_detection/protos/*.proto --python_out=.
 
 for tf <1.5 go to commit 196d173 (this is compatible with tf 1.4.1)
 
-### Probable error:
-
- If you faced the following error:
-```bash
-ValueError: Tried to convert 't' to a tensor and failed. Error: Argument must be a dense tensor: range(0, 3) - got shape [3], but wanted [].
-```
-
-Solve it from [here](https://github.com/tensorflow/models/issues/3705)
 
 ### Prepare data for train:
 
@@ -50,3 +42,23 @@ fine_tune_checkpoint: /path/to/downloded/pretrained/model/from/[here](https://gi
 input_path: /path/to/.record __file__ (__data__)
 
 label_map_path: /path/to/map/file/.pbtxt __file__ (__data__)
+
+
+
+
+
+### Probable error:
+
+ * object_detection with tf > 1.5 has compatibility issue with python3.x. If you faced the following error:
+```bash
+ValueError: Tried to convert 't' to a tensor and failed. Error: Argument must be a dense tensor: range(0, 3) - got shape [3], but wanted [].
+```
+In ```models/research/object_detection/utils/learning_schedules.py``` lines 167-169, Wrap ```list()``` around the ```range()``` like this:
+```python
+rate_index = tf.reduce_max(tf.where(tf.greater_equal(global_step, boundaries),
+                                     list(range(num_boundaries)),
+                                      [0] * num_boundaries))
+```
+[Reference](https://github.com/tensorflow/models/issues/3705)
+
+* If stucked with ```INFO:tensorflow:global_step/sec: 0``` you might have some issues with the ```.record``` data file. Double check your input data file.
