@@ -85,7 +85,7 @@ Locate your ```object_detection``` folder and copy the ```export_inference_graph
 python export_inference_graph.py \
 --ipnut_type=image_tensor \
 --pipeline_config_path=training/faster_rcnn_inception_resnet_v2_atrous_coco.config \
---trained_chechpoint_prefix=training/model.ckpt-20000
+--trained_checkpoint_prefix=training/model.ckpt-20000
 --output_directory=new_model
 ```
 __NOTE__: Make sure you have all 3 ```.index```,```.meta``` and ```.data``` files for that checkpoint.

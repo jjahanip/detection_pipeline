@@ -100,9 +100,9 @@ def write_crops(save_folder, image_filenames, centers_filename, crop_size=[300, 
 def main():
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--input_dir', type=str, default='/data/input_imgs', help='path to the directory of input images and centers file')
+    parser.add_argument('--input_dir', type=str, default='data/input_data', help='path to the directory of input images and centers file')
     parser.add_argument('--crop_size', type=str, default='300,300', help='size of the cropped image e.g. 300,300')
-    parser.add_argument('--save_dir', type=str, default='/data', help='path to the folders of new images and xml files')
+    parser.add_argument('--save_dir', type=str, default='data', help='path to save the folders of new images and xml files')
     parser.add_argument('--adjust_image', action='store_true',  help='adjust histogram of image')
     parser.add_argument('--visualize', type=int, default=0, help='visualize n sample images with bbxs')
     args = parser.parse_args()
@@ -135,7 +135,7 @@ def main():
 
 
     write_crops(save_folder, input_fnames, centers_fname, crop_size=crop_size, adjust_hist=adjust_image, vis_idx=vis_idx)
-    print('Successfully created the cropped images and corresponding xml files in:\n {}\n{}'
+    print('Successfully created the cropped images and corresponding xml files in:\n{}\n{}'
           .format(args.save_dir+'/imgs', args.save_dir+'/xmls'))
 
 
