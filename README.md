@@ -13,6 +13,20 @@ detection_pipeline is a tool for cell detection.
   ``` bash
   protoc object_detection/protos/*.proto --python_out=.
   ```
+  __*NOTE:__ Make sure the executable folder is added to your path variable:
+
+    - (__for Windows__):
+      ```bash
+      # From Protoc*/bin
+      SET PATH=%PATH%;%cd%
+      ```
+    
+    - (__for Linux and Mac__):
+      ```bash
+      # From Protoc*/bin
+      export PATH=$PATH:`pwd`
+      ```
+
   2. Add object_detection and slim folders to PYTHONPATH.
 
     - (__for Windows__):
@@ -172,5 +186,7 @@ __NOTE__: Make sure you have all 3 ```.index```,```.meta``` and ```.data``` file
                                        list(range(num_boundaries)),
                                         [0] * num_boundaries))
   ```
+
+  3. __(for windows):__ 
 
 4. If stucked with ```INFO:tensorflow:global_step/sec: 0``` you might have some issues with the ```.record``` data file. Double check your input data file.
