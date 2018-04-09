@@ -2,11 +2,30 @@
 
 detection_pipeline is a tool for cell detection.
 
-# Dependencies
+# Dependencies:
 
-* Tensorflow
-* Object detection toolkit (download from [here](https://github.com/tensorflow/models) and install from [here](https://github.com/tensorflow/models/blob/master/research/object_detection/g3doc/installation.md))
-  * (__for windows__): Install protofub from [here](https://github.com/google/protobuf/releases).
+* Tensorflow v1.4.* or later!
+
+* [Protobuf](https://github.com/google/protobuf/releases)
+
+# Installation:
+  1. Download Protobuf from [here]((https://github.com/google/protobuf/releases)) and run the following command from ```lib``` directory:
+  ``` bash
+  protoc object_detection/protos/*.proto --python_out=.
+  ```
+  2. Add object_detection and slim folders to PYTHONPATH.
+
+    - (__for Windows__):
+      ```bash
+      # From tensorflow/models/research/
+      SET PYTHONPATH=%cd%;%cd%\slim
+      ```
+    
+    - (__for Linux and Mac__):
+      ```bash
+      # From tensorflow/models/research/
+      export PYTHONPATH=$PYTHONPATH:`pwd`:`pwd`/slim
+      ```
 
 # Pipeline:
 
@@ -39,11 +58,9 @@ display_name: "Nucleus"
 ```
 
 ### 4. Train:
-1. Locate your ```object_detection``` folder and copy the ```train.py``` file to the ```detection_pipeline``` directory.
+1. Download your pretrained model from [here](https://github.com/tensorflow/models/blob/master/research/object_detection/g3doc/detection_model_zoo.md) and save it in folder ```pretrained_models ```.
 
-2. Download your pretrained model from [here](https://github.com/tensorflow/models/blob/master/research/object_detection/g3doc/detection_model_zoo.md) and save it in folder ```pretrained_models ```.
-
-3. create a __training__ folder to save the training model and parameters. Inside the __training__ folder copy the .config file from ```/tensorflow/models/research/object_detection/samples/configs/```.
+2. create a __training__ folder to save the training model and parameters. Inside the __training__ folder copy the .config file from ```lib/object_detection/samples/configs/```.
 For example ```faster_rcnn_inception_resnet_v2_atrous_coco.config``` file.
 
   * edit the following lines:
@@ -71,7 +88,7 @@ For example ```faster_rcnn_inception_resnet_v2_atrous_coco.config``` file.
   # num_readers: 1
   # }
   ```
-4. Now you can train your model:
+3. Now you can train your model:
   ```bash
   python train.py \
   --logtostderr \
@@ -80,7 +97,7 @@ For example ```faster_rcnn_inception_resnet_v2_atrous_coco.config``` file.
   ```
   
 ### 5. Export Inference Graph:
-Locate your ```object_detection``` folder and copy the ```export_inference_graph.py``` file to the ```detection_pipeline``` directory.
+Run the following command to export the inference graph for test:
 ```bash
 python export_inference_graph.py \
 --ipnut_type=image_tensor \
