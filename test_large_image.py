@@ -118,6 +118,7 @@ def main():
     parser.add_argument('--input_dir', type=str, default='data/LiVPa/input_data', help='path to the large input images direcotry')
     parser.add_argument('--crop_size', type=str, default='300,300', help='size of the cropped image e.g. 300,300')
     parser.add_argument('--model_dir', type=str, default='new_model', help='path to exported model directory')
+    parser.add_argument('--output_file', type=str, default='bbxs.txt', help='path to txt file of coordinates')
     parser.add_argument('--labels_file', type=str, default='data/nucleus_map.pbtxt', help='path to label map pbtxt file')
     parser.add_argument('--num_classes', type=int, default=1, help='number of the classes')
     parser.add_argument('--adjust_image', action='store_true',  help='adjust histogram of image')
@@ -164,32 +165,31 @@ def main():
     #                                                         use_display_name=True)
     # category_index = label_map_util.create_category_index(categories)
 
-    for corner, crop in get_crop(input_fnames, crop_size=crop_size, adjust_hist=adjust_image):
-        output_dict = run_inference_for_single_image(crop, detection_graph)
-        keep_boxes = output_dict['detection_scores'] > .5
-        detection_boxes = output_dict['detection_boxes'][keep_boxes]
-        detection_scores = output_dict['detection_scores'][keep_boxes]
+    with open(args.output_file, 'w') as f:
+        f.write('xmin,ymin,xmax,ymax\n')
 
         bbxs = []
-        for box in detection_boxes:
-            box = tuple(box.tolist())
-            ymin, xmin, ymax, xmax = box
-            xmin = xmin * crop_size[0]
-            xmax = xmax * crop_size[0]
-            ymin = ymin * crop_size[1]
-            ymax = ymax * crop_size[1]
-            bbxs.append(np.rint([xmin, ymin, xmax - xmin, ymax - ymin]).astype(int))
+        for corner, crop in get_crop(input_fnames, crop_size=crop_size, adjust_hist=adjust_image):
+            output_dict = run_inference_for_single_image(crop, detection_graph)
+            keep_boxes = output_dict['detection_scores'] > .5
+            detection_boxes = output_dict['detection_boxes'][keep_boxes]
+            detection_scores = output_dict['detection_scores'][keep_boxes]
 
-        visualize_bbxs(crop, bbxs=np.array(bbxs))
+            crop_bbxs = []
+            for box in detection_boxes:
+                box = tuple(box.tolist())
+                ymin, xmin, ymax, xmax = box
+                xmin = xmin * crop_size[0]
+                xmax = xmax * crop_size[0]
+                ymin = ymin * crop_size[1]
+                ymax = ymax * crop_size[1]
 
+                f.write('{},{},{},{}\n'.format(xmin, ymin, xmax - xmin, ymax - ymin))
+                # crop_bbxs.append(single_box)
+                # single_box = np.rint([xmin, ymin, xmax - xmin, ymax - ymin]).astype(int)
+                # bbxs.append(np.rint([xmin, ymin, xmax - xmin, ymax - ymin]).astype(int))
 
-
-
-        a=1
-
-
-    print('Successfully created the cropped images and corresponding xml files in:\n{}\n{}'
-          .format(args.save_dir+'/imgs', args.save_dir+'/xmls'))
+            # visualize_bbxs(crop, bbxs=np.array(bbxs))
 
 
 if __name__ == '__main__':
