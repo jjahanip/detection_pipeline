@@ -34,7 +34,7 @@ def visualize_bbxs(image, centers=None, bbxs=None):
 
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    ax.imshow(np.divide(image, 256).astype(np.uint8))
+    ax.imshow(image)
     if centers is not None:
         ax.plot(centers[:, 0], centers[:, 1], 'b.')
     if bbxs is not None:
