@@ -28,6 +28,7 @@ def write_crops(save_folder, image_filenames, centers_filename, crop_size=[300, 
     # grayscale image (1 channel)
     if len(image_filenames) == 1:
         image = skimage.io.imread(image_filenames[0])  # read single channel image
+        image = skimage.img_as_ubyte(image)            # cast to 8-bit
         if adjust_hist:
             image = imadjust(image)                    # adjust the histogram of the image
             image = np.expand_dims(image, axis=2)      # add depth dimension
@@ -36,7 +37,9 @@ def write_crops(save_folder, image_filenames, centers_filename, crop_size=[300, 
     if len(image_filenames) > 1:
         img = []
         for i, image_filename in enumerate(image_filenames):
-            img.append(skimage.io.imread(image_filename))               # read each channel
+            im_ch = skimage.io.imread(image_filename)     # read each channel
+            im_ch = skimage.img_as_ubyte(im_ch)           # cast to 8-bit
+            img.append(im_ch)
             if adjust_hist:
                 img[i] = imadjust(img[i])                               # adjust the histogram of the image
         if len(image_filenames) == 2:                                   # if two channels were provided
@@ -92,7 +95,7 @@ def write_crops(save_folder, image_filenames, centers_filename, crop_size=[300, 
 
             # visualize bbxs
             if crop_idx < vis_idx:
-                    visualize_bbxs(crop_img, centers=crop_centers, bbxs=crop_bbxs)
+                visualize_bbxs(crop_img, centers=crop_centers, bbxs=crop_bbxs)
 
             crop_idx = crop_idx + 1
 
@@ -100,9 +103,9 @@ def write_crops(save_folder, image_filenames, centers_filename, crop_size=[300, 
 def main():
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--input_dir', type=str, default='data/input_data', help='path to the directory of input images and centers file')
+    parser.add_argument('--input_dir', type=str, default='data/LiVPa/input_data', help='path to the directory of input images and centers file')
     parser.add_argument('--crop_size', type=str, default='300,300', help='size of the cropped image e.g. 300,300')
-    parser.add_argument('--save_dir', type=str, default='data', help='path to save the folders of new images and xml files')
+    parser.add_argument('--save_dir', type=str, default='data', help='path to the folders of new images and xml files')
     parser.add_argument('--adjust_image', action='store_true',  help='adjust histogram of image')
     parser.add_argument('--visualize', type=int, default=0, help='visualize n sample images with bbxs')
     args = parser.parse_args()
