@@ -45,12 +45,7 @@ detection_pipeline is a tool for cell detection.
 
 ### 1. Create small crops from large images and centers
 ```bash
-python write_crops.py \
---images_dir=data/input_data \
---crop_size=300,300 \
---save_dir=data \
---adjust_image \
---visualize=2
+python write_crops.py --images_dir=data/input_data --crop_size=300,300 --save_dir=data --adjust_image --visualize=2
 ```
 __NOTE__: Use visualize if you want to see the first "n" crops to make sure everything is right.
 
@@ -58,9 +53,7 @@ __NOTE__: Use visualize if you want to see the first "n" crops to make sure ever
 
 ### 3. Generate tfrecord file from xmls and imgs
 ```bash
-python generate_tfrecord.py \ 
---input_dir=data \
---output_path=data/train.record
+python generate_tfrecord.py --input_dir=data --output_path=data/train.record
 ```
 Create a label map for mapping classes to unique IDs. For example create a ```nucleus_map.pbtxt``` file inside ```data``` folder and add following lines:
 ```vim
@@ -104,49 +97,23 @@ For example ```faster_rcnn_inception_resnet_v2_atrous_coco.config``` file.
   ```
 3. Now you can train your model:
   ```bash
-  python train.py \
-  --logtostderr \
-  --train_dir=training \
-  --pipeline_config_path=training/faster_rcnn_inception_resnet_v2_atrous_coco.config
+  python train.py --logtostderr --train_dir=training --pipeline_config_path=training/faster_rcnn_inception_resnet_v2_atrous_coco.config
   ```
   
 ### 5. Export Inference Graph:
 Run the following command to export the inference graph for test:
 ```bash
-python export_inference_graph.py \
---ipnut_type=image_tensor \
---pipeline_config_path=training/faster_rcnn_inception_resnet_v2_atrous_coco.config \
---trained_checkpoint_prefix=training/model.ckpt-20000
---output_directory=new_model
+python export_inference_graph.py --ipnut_type=image_tensor --pipeline_config_path=training/faster_rcnn_inception_resnet_v2_atrous_coco.config --trained_checkpoint_prefix=training/model.ckpt-20000 --output_directory=new_model
 ```
 __NOTE__: Make sure you have all 3 ```.index```,```.meta``` and ```.data``` files for that checkpoint.
 
-### 6. Test:
+### 6. Visualization Test:
 1. Create ```test_image``` folder and put some sample images.
-2. Locate your ```object_detection``` folder and copy the ```object_detection_tutorial.ipynb``` file to the ```detection_pipeline``` directory.
-3. update the following:
-  
-  * in __Variables__: 
-  ```python
-  # What model to load.
-  MODEL_NAME = 'new_model'  
-  # Path to frozen detection graph. This is the actual model that is used for the object detection.
-  PATH_TO_CKPT = MODEL_NAME + '/frozen_inference_graph.pb'  
-  # List of the strings that is used to add correct label for each box.
-  PATH_TO_LABELS = os.path.join('data', 'nucleus_map.pbtxt') 	
-  NUM_CLASSES = 1
-  ```
+2. run ```test.ipynb``` in jupyter notebook.
 
-  * Delete __Download Model__ cell.
+### 7. Detect cells in large images:
+coming soon ...
 
-  * in __Detection__:
-
-  ```python
-  PATH_TO_TEST_IMAGES_DIR = 'test_images'
-  TEST_IMAGE_PATHS = [os.path.join(PATH_TO_TEST_IMAGES_DIR, test_image) for test_image in os.listdir(PATH_TO_TEST_IMAGES_DIR)]
-  # Size, in inches, of the output images.
-  IMAGE_SIZE = (12, 8)
-  ```
 
 # Probable Errors:
 
@@ -186,7 +153,5 @@ __NOTE__: Make sure you have all 3 ```.index```,```.meta``` and ```.data``` file
                                        list(range(num_boundaries)),
                                         [0] * num_boundaries))
   ```
-
-  3. __(for windows):__ 
-
+  
 4. If stucked with ```INFO:tensorflow:global_step/sec: 0``` you might have some issues with the ```.record``` data file. Double check your input data file.
