@@ -62,8 +62,24 @@ def get_crop(image_filenames, crop_size=[300, 300], adjust_hist=False, vis_idx=0
 
             # crop the image
             crop_img = image[i:i + crop_height, j:j + crop_width, :]   # create crop image
+            # if we were at the edges of the image
+            # crop new image with the size of crop from the end of image
+            if crop_img.shape[:2][::-1] != tuple(crop_size):
+                # if both dims are at the end
+                if np.all(crop_img.shape[:2][::-1] != np.array(crop_size)):
+                    crop_img = image[-crop_height:, -crop_width:, :]
+                    i = img_rows - crop_height
+                    j = img_cols - crop_width
+                # if xdim is at the end
+                if crop_img.shape[:2][::-1][0] != tuple(crop_size)[0]:
+                    crop_img = image[i:i + crop_height, -crop_width:, :]
+                    j = img_cols - crop_width
+                # if ydim is at the end
+                if crop_img.shape[:2][::-1][1] != tuple(crop_size)[1]:
+                    crop_img = image[-crop_height:, j:j + crop_width, :]
+                    i = img_rows - crop_height
 
-            yield [i, j], crop_img
+            yield [j, i], crop_img
 
 def run_inference_for_single_image(image, graph):
     with graph.as_default():
@@ -115,9 +131,9 @@ def run_inference_for_single_image(image, graph):
 def main():
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--input_dir', type=str, default='data/LiVPa/input_data', help='path to the large input images direcotry')
+    parser.add_argument('--input_dir', type=str, default='data/test', help='path to the large input images direcotry')
     parser.add_argument('--crop_size', type=str, default='300,300', help='size of the cropped image e.g. 300,300')
-    parser.add_argument('--model_dir', type=str, default='new_model', help='path to exported model directory')
+    parser.add_argument('--model_dir', type=str, default='freezed_model1', help='path to exported model directory')
     parser.add_argument('--output_file', type=str, default='bbxs.txt', help='path to txt file of coordinates')
     parser.add_argument('--labels_file', type=str, default='data/nucleus_map.pbtxt', help='path to label map pbtxt file')
     parser.add_argument('--num_classes', type=int, default=1, help='number of the classes')
@@ -168,28 +184,34 @@ def main():
     with open(args.output_file, 'w') as f:
         f.write('xmin,ymin,xmax,ymax\n')
 
-        bbxs = []
+        # bbxs = []
         for corner, crop in get_crop(input_fnames, crop_size=crop_size, adjust_hist=adjust_image):
             output_dict = run_inference_for_single_image(crop, detection_graph)
             keep_boxes = output_dict['detection_scores'] > .5
             detection_boxes = output_dict['detection_boxes'][keep_boxes]
-            detection_scores = output_dict['detection_scores'][keep_boxes]
+            # detection_scores = output_dict['detection_scores'][keep_boxes]
 
             crop_bbxs = []
             for box in detection_boxes:
-                box = tuple(box.tolist())
+                box = box.tolist()
                 ymin, xmin, ymax, xmax = box
-                xmin = xmin * crop_size[0]
-                xmax = xmax * crop_size[0]
-                ymin = ymin * crop_size[1]
-                ymax = ymax * crop_size[1]
+
+                crop_bbxs.append([xmin * crop_size[0],
+                                  ymin * crop_size[1],
+                                  (xmax - xmin) * crop_size[0],
+                                  (ymax - ymin) * crop_size[1]])
+
+                xmin = np.rint(xmin * crop_size[0] + corner[0]).astype(int)
+                xmax = np.rint(xmax * crop_size[0] + corner[0]).astype(int)
+                ymin = np.rint(ymin * crop_size[1] + corner[1]).astype(int)
+                ymax = np.rint(ymax * crop_size[1] + corner[1]).astype(int)
 
                 f.write('{},{},{},{}\n'.format(xmin, ymin, xmax - xmin, ymax - ymin))
-                # crop_bbxs.append(single_box)
-                # single_box = np.rint([xmin, ymin, xmax - xmin, ymax - ymin]).astype(int)
-                # bbxs.append(np.rint([xmin, ymin, xmax - xmin, ymax - ymin]).astype(int))
 
-            # visualize_bbxs(crop, bbxs=np.array(bbxs))
+            visualize_bbxs(crop, bbxs=np.array(crop_bbxs))
+
+
+
 
 
 if __name__ == '__main__':
