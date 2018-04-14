@@ -14,8 +14,8 @@ import matplotlib.patches as patches
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--input_dir', type=str, default='data/input_data', help='path to the directory of input images and centers file')
-parser.add_argument('--crop_size', type=str, default='300,300', help='size of the cropped image e.g. 300,300')
-parser.add_argument('--save_dir', type=str, default='data', help='path to the folders of new images and xml files')
+parser.add_argument('--crop_size', type=str, default='1000,1000', help='size of the cropped image e.g. 300,300')
+parser.add_argument('--save_dir', type=str, default='data/', help='path to the folders of new images and xml files')
 parser.add_argument('--adjust_image', action='store_true', help='adjust histogram of image')
 parser.add_argument('--visualize', type=int, default=0, help='visualize n sample images with bbxs')
 args = parser.parse_args()
@@ -78,7 +78,25 @@ def write_crops(save_folder, image_filenames, centers_filename, crop_size=[300, 
             # crop the image
             crop_img = image[i:crop_height + i, j:crop_width + j]   # create crop image
             if crop_img.shape[:2][::-1] != tuple(crop_size):
-                continue
+                if crop_img.shape[:2][::-1] != tuple(crop_size):
+                    # if both dims are at the end
+                    if np.all(crop_img.shape[:2][::-1] != np.array(crop_size)):
+                        crop_img = image[-crop_height:, -crop_width:, :]
+                        i = img_rows - crop_height
+                        j = img_cols - crop_width
+                    # if xdim is at the end
+                    if crop_img.shape[:2][::-1][0] != tuple(crop_size)[0]:
+                        crop_img = image[i:i + crop_height, -crop_width:, :]
+                        j = img_cols - crop_width
+                    # if ydim is at the end
+                    if crop_img.shape[:2][::-1][1] != tuple(crop_size)[1]:
+                        crop_img = image[-crop_height:, j:j + crop_width, :]
+                        i = img_rows - crop_height
+                crop_centers = centers[(centers[:, 0] >= j) & (centers[:, 0] < j + crop_width) &
+                                       (centers[:, 1] >= i) & (centers[:, 1] < i + crop_height)]
+                # shift the x & y values based on crop size
+                crop_centers[:, 0] = crop_centers[:, 0] - j
+                crop_centers[:, 1] = crop_centers[:, 1] - i
 
             crop_name = str(i) + '_' + str(j) + '.jpeg'             # filename contains x & y coords of top left corner
             with warnings.catch_warnings():
