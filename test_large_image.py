@@ -81,6 +81,7 @@ def get_crop(image_filenames, crop_size=[300, 300], adjust_hist=False, vis_idx=0
 
             yield [j, i], crop_img
 
+
 def run_inference_for_single_image(image, graph):
     with graph.as_default():
         with tf.Session() as sess:
@@ -127,6 +128,63 @@ def run_inference_for_single_image(image, graph):
                 output_dict['detection_masks'] = output_dict['detection_masks'][0]
     return output_dict
 
+def non_max_suppression_fast(boxes, overlapThresh):
+    # Malisiewicz et al.
+    # if there are no boxes, return an empty list
+    if len(boxes) == 0:
+        return []
+
+    # if the bounding boxes integers, convert them to floats --
+    # this is important since we'll be doing a bunch of divisions
+    if boxes.dtype.kind == "i":
+        boxes = boxes.astype("float")
+
+    # initialize the list of picked indexes
+    pick = []
+
+    # grab the coordinates of the bounding boxes
+    x1 = boxes[:, 0]
+    y1 = boxes[:, 1]
+    x2 = boxes[:, 2]
+    y2 = boxes[:, 3]
+
+    # compute the area of the bounding boxes and sort the bounding
+    # boxes by the bottom-right y-coordinate of the bounding box
+    area = (x2 - x1 + 1) * (y2 - y1 + 1)
+    idxs = np.argsort(y2)
+
+    # keep looping while some indexes still remain in the indexes
+    # list
+    while len(idxs) > 0:
+        # grab the last index in the indexes list and add the
+        # index value to the list of picked indexes
+        last = len(idxs) - 1
+        i = idxs[last]
+        pick.append(i)
+
+        # find the largest (x, y) coordinates for the start of
+        # the bounding box and the smallest (x, y) coordinates
+        # for the end of the bounding box
+        xx1 = np.maximum(x1[i], x1[idxs[:last]])
+        yy1 = np.maximum(y1[i], y1[idxs[:last]])
+        xx2 = np.minimum(x2[i], x2[idxs[:last]])
+        yy2 = np.minimum(y2[i], y2[idxs[:last]])
+
+        # compute the width and height of the bounding box
+        w = np.maximum(0, xx2 - xx1 + 1)
+        h = np.maximum(0, yy2 - yy1 + 1)
+
+        # compute the ratio of overlap
+        overlap = (w * h) / area[idxs[:last]]
+
+        # delete all indexes from the index list that have
+        idxs = np.delete(idxs, np.concatenate(([last],
+                                               np.where(overlap > overlapThresh)[0])))
+
+    # return only the bounding boxes that were picked using the
+    # integer data type
+    return boxes[pick].astype("int")
+
 
 def main():
 
@@ -138,6 +196,8 @@ def main():
     parser.add_argument('--labels_file', type=str, default='data/nucleus_map.pbtxt', help='path to label map pbtxt file')
     parser.add_argument('--num_classes', type=int, default=1, help='number of the classes')
     parser.add_argument('--adjust_image', action='store_true',  help='adjust histogram of image')
+    parser.add_argument('--visualize_crop', type=int, default=0, help='visualize n sample images with bbxs')
+
     args = parser.parse_args()
 
     # read input
@@ -164,7 +224,7 @@ def main():
     # NUM_CLASSES = args.num_classes
 
     # read number of images to be visualized
-    # vis_idx = args.visualize
+    vis_idx = args.visualize_crop
 
     # load frozen model to memory
     detection_graph = tf.Graph()
@@ -181,37 +241,49 @@ def main():
     #                                                         use_display_name=True)
     # category_index = label_map_util.create_category_index(categories)
 
-    with open(args.output_file, 'w') as f:
-        f.write('xmin,ymin,xmax,ymax\n')
 
-        # bbxs = []
-        for corner, crop in get_crop(input_fnames, crop_size=crop_size, adjust_hist=adjust_image):
-            output_dict = run_inference_for_single_image(crop, detection_graph)
-            keep_boxes = output_dict['detection_scores'] > .5
-            detection_boxes = output_dict['detection_boxes'][keep_boxes]
-            # detection_scores = output_dict['detection_scores'][keep_boxes]
+    bbxs = []
 
-            crop_bbxs = []
-            for box in detection_boxes:
-                box = box.tolist()
-                ymin, xmin, ymax, xmax = box
+    # for each crop:
+    crop_idx = 0
+    for corner, crop in get_crop(input_fnames, crop_size=crop_size, adjust_hist=adjust_image):
+        output_dict = run_inference_for_single_image(crop, detection_graph)
+        keep_boxes = output_dict['detection_scores'] > .5
+        detection_boxes = output_dict['detection_boxes'][keep_boxes]
+        # detection_scores = output_dict['detection_scores'][keep_boxes]
 
-                crop_bbxs.append([xmin * crop_size[0],
-                                  ymin * crop_size[1],
-                                  (xmax - xmin) * crop_size[0],
-                                  (ymax - ymin) * crop_size[1]])
+        crop_bbxs = []
+        for box in detection_boxes:
+            box = box.tolist()
+            ymin, xmin, ymax, xmax = box
 
-                xmin = np.rint(xmin * crop_size[0] + corner[0]).astype(int)
-                xmax = np.rint(xmax * crop_size[0] + corner[0]).astype(int)
-                ymin = np.rint(ymin * crop_size[1] + corner[1]).astype(int)
-                ymax = np.rint(ymax * crop_size[1] + corner[1]).astype(int)
+            crop_bbxs.append([xmin * crop_size[0],
+                              ymin * crop_size[1],
+                              (xmax - xmin) * crop_size[0],
+                              (ymax - ymin) * crop_size[1]])
 
-                f.write('{},{},{},{}\n'.format(xmin, ymin, xmax - xmin, ymax - ymin))
+            xmin = np.rint(xmin * crop_size[0] + corner[0]).astype(int)
+            xmax = np.rint(xmax * crop_size[0] + corner[0]).astype(int)
+            ymin = np.rint(ymin * crop_size[1] + corner[1]).astype(int)
+            ymax = np.rint(ymax * crop_size[1] + corner[1]).astype(int)
 
+            # append each bbx to the list
+            bbxs.append([xmin, ymin, xmax, ymax])
+
+
+        # visualize bbxs
+        if crop_idx < vis_idx:
             visualize_bbxs(crop, bbxs=np.array(crop_bbxs))
+        crop_idx = crop_idx + 1
 
+    # remove overlapping bounding boxes due to cropping with overlap
+    new_bbxs = non_max_suppression_fast(np.array(bbxs), .5)
+    # 3rd and 4th cols are width and height of bbx
+    new_bbxs[:, 2] = new_bbxs[:, 2] - new_bbxs[:, 0]
+    new_bbxs[:, 3] = new_bbxs[:, 3] - new_bbxs[:, 1]
+    np.savetxt(args.output_file, new_bbxs, fmt='%d,%d,%d,%d', header='xmin,ymin,width,height')
 
-
+    a = 1
 
 
 if __name__ == '__main__':
