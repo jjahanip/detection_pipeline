@@ -278,12 +278,10 @@ def main():
 
     # remove overlapping bounding boxes due to cropping with overlap
     new_bbxs = non_max_suppression_fast(np.array(bbxs), .5)
-    # 3rd and 4th cols are width and height of bbx
-    new_bbxs[:, 2] = new_bbxs[:, 2] - new_bbxs[:, 0]
-    new_bbxs[:, 3] = new_bbxs[:, 3] - new_bbxs[:, 1]
-    np.savetxt(args.output_file, new_bbxs, fmt='%d,%d,%d,%d', header='xmin,ymin,width,height')
 
-    a = 1
+    # save to the file
+    np.savetxt(args.output_file, new_bbxs, fmt='%d,%d,%d,%d', header='xmin,ymin,xmax,ymax')
+
 
 
 if __name__ == '__main__':
