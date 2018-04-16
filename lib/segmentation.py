@@ -155,7 +155,7 @@ def watershedSegmentation(img, blobs, maskCorrectR=0, maskDilateR=0, LoG_Para=[]
     
     for i, Component in enumerate(PropertyTable):
         bbox = Component.bbox
-        bboxs[i, :] = [bbox[0], bbox[1], bbox[2] - bbox[0], bbox[3] - bbox[1]]
+        bboxs[i, :] = [bbox[0], bbox[1], bbox[2], bbox[3]]
         
     # print('Use watershed generate segmentation borders done!')
     

@@ -13,9 +13,9 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--input_dir', type=str, default='data/input_data', help='path to the directory of input images and centers file')
-parser.add_argument('--crop_size', type=str, default='1000,1000', help='size of the cropped image e.g. 300,300')
-parser.add_argument('--save_dir', type=str, default='data/', help='path to the folders of new images and xml files')
+parser.add_argument('--input_dir', type=str, default='data/sham/input_data', help='path to the directory of input images and centers file')
+parser.add_argument('--crop_size', type=str, default='300,300', help='size of the cropped image e.g. 300,300')
+parser.add_argument('--save_dir', type=str, default='data/sham', help='path to the folders of new images and xml files')
 parser.add_argument('--adjust_image', action='store_true', help='adjust histogram of image')
 parser.add_argument('--visualize', type=int, default=0, help='visualize n sample images with bbxs')
 args = parser.parse_args()
@@ -39,7 +39,7 @@ def write_crops(save_folder, image_filenames, centers_filename, crop_size=[300, 
         image = skimage.img_as_ubyte(image)            # cast to 8-bit
         if adjust_hist:
             image = imadjust(image)                    # adjust the histogram of the image
-            image = np.expand_dims(image, axis=2)      # add depth dimension
+        image = np.stack((image for _ in range(3)), axis=2)  # change to np array rgb image
 
     # RGB image (3 channels)
     if len(image_filenames) > 1:
@@ -77,6 +77,8 @@ def write_crops(save_folder, image_filenames, centers_filename, crop_size=[300, 
 
             # crop the image
             crop_img = image[i:crop_height + i, j:crop_width + j]   # create crop image
+
+            # of crop was on the edges, take the whole size of crop
             if crop_img.shape[:2][::-1] != tuple(crop_size):
                 if crop_img.shape[:2][::-1] != tuple(crop_size):
                     # if both dims are at the end
@@ -107,12 +109,14 @@ def write_crops(save_folder, image_filenames, centers_filename, crop_size=[300, 
             crop_bbxs = GenerateBBoxfromSeeds(crop_img[:, :, 0], crop_centers)
 
             # remove bbxs with width <10 or height<10
-            crop_bbxs = crop_bbxs[(crop_bbxs[:, 2] > 10) & (crop_bbxs[:, 3] > 10)]
+            crop_bbxs = crop_bbxs[(crop_bbxs[:, 2] - crop_bbxs[:, 0] > 10) &
+                                  (crop_bbxs[:, 3] - crop_bbxs[:, 1] > 10)]
 
             # remove bbxs fall out of image
-            crop_bbxs = crop_bbxs[(crop_bbxs[:, 0] >= 0) & (crop_bbxs[:, 1] >= 0) &
-                                  (crop_bbxs[:, 0] + crop_bbxs[:, 2] < crop_width) &
-                                  (crop_bbxs[:, 1] + crop_bbxs[:, 3] < crop_height)]
+            crop_bbxs = crop_bbxs[(crop_bbxs[:, 0] >= 0) &
+                                  (crop_bbxs[:, 1] >= 0) &
+                                  (crop_bbxs[:, 2] < crop_width) &
+                                  (crop_bbxs[:, 3] < crop_height)]
 
             # write bounding boxes in xml file
             xml_name = str(i) + '_' + str(j) + '.xml'  # filename contains x & y coords of top left corner

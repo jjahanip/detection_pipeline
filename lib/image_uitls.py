@@ -39,7 +39,10 @@ def visualize_bbxs(image, centers=None, bbxs=None):
         ax.plot(centers[:, 0], centers[:, 1], 'b.')
     if bbxs is not None:
         for idx in range(bbxs.shape[0]):
-            ax.add_patch(patches.Rectangle((bbxs[idx, 0], bbxs[idx, 1]),
-                                            bbxs[idx, 2], bbxs[idx, 3],
+            xmin = bbxs[idx, 0]
+            ymin = bbxs[idx, 1]
+            width = bbxs[idx, 2] - bbxs[idx, 0]
+            height = bbxs[idx, 3] - bbxs[idx, 1]
+            ax.add_patch(patches.Rectangle((xmin, ymin), width, height,
                                            edgecolor="blue", fill=False))
     plt.show()
