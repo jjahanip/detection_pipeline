@@ -122,9 +122,7 @@ def write_xml(xml_fname, bboxes, labels, image_size=(300, 300, 1)):
 
     # write the object information
     for bbox, label in zip(bboxes, labels):
-        [xmin, ymin, cell_width, cell_height] = bbox
-        xmax = xmin + cell_width
-        ymax = ymin + cell_height
+        [xmin, ymin, xmax, ymax] = bbox
         write_object(f, str(xmin), str(ymin), str(xmax), str(ymax), str(label))
 
     line = '</annotation>\n'
