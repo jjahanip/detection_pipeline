@@ -171,5 +171,6 @@ def GenerateBBoxfromSeeds(img, centroids):
                                                                 LoG_Para=[],
                                                                 offset=0.1,
                                                                 fillhole=False)
-    bboxs[:, [0, 1]] = bboxs[:, [1, 0]]
+    # in the format [xmin ymin xmax ymax]
+    bboxs[:, [0, 1, 2, 3]] = bboxs[:, [1, 0, 3, 2]]
     return bboxs
