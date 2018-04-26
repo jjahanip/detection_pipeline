@@ -30,7 +30,7 @@ def imadjust(img, tol=[0.01, 0.99]):
     return img_out
 
 
-def visualize_bbxs(image, centers=None, bbxs=None):
+def visualize_bbxs(image, centers=None, bbxs=None, save=False):
 
     fig = plt.figure()
     ax = fig.add_subplot(111)
@@ -45,4 +45,8 @@ def visualize_bbxs(image, centers=None, bbxs=None):
             height = bbxs[idx, 3] - bbxs[idx, 1]
             ax.add_patch(patches.Rectangle((xmin, ymin), width, height,
                                            edgecolor="blue", fill=False))
-    plt.show()
+    if save:
+        fig.savefig('visualized_image.png', bbox_inches='tight')
+    else:
+        plt.show()
+    
