@@ -40,11 +40,15 @@ Example usage:
         --train_config_path=train_config.pbtxt \
         --input_config_path=train_input_config.pbtxt
 """
-
+import sys
 import functools
 import json
 import os
 import tensorflow as tf
+
+# Add necessary paths
+sys.path.append("./lib/")
+sys.path.append("./lib/slim")
 
 from object_detection import trainer
 from object_detection.builders import dataset_builder
