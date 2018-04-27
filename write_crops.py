@@ -13,11 +13,11 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--input_dir', type=str, default='data/sham/input_data', help='path to the directory of input images and centers file')
+parser.add_argument('--input_dir', type=str, default='data/vehicle/input_data', help='path to the directory of input images and centers file')
 parser.add_argument('--crop_size', type=str, default='300,300', help='size of the cropped image e.g. 300,300')
-parser.add_argument('--save_dir', type=str, default='data/sham', help='path to the folders of new images and xml files')
+parser.add_argument('--save_dir', type=str, default='data/vehicle', help='path to the folders of new images and xml files')
 parser.add_argument('--adjust_image', action='store_true', help='adjust histogram of image')
-parser.add_argument('--visualize', type=int, default=0, help='visualize n sample images with bbxs')
+parser.add_argument('--visualize', type=int, default=20, help='visualize n sample images with bbxs')
 args = parser.parse_args()
 
 
@@ -32,13 +32,13 @@ def write_crops(save_folder, image_filenames, centers_filename, crop_size=[300, 
         os.mkdir(os.path.join(save_folder, 'imgs'))
     if 'xmls' not in dir_list:
         os.mkdir(os.path.join(save_folder, 'xmls'))
+    if 'adjusted_imgs' not in dir_list and adjust_hist:
+        os.mkdir(os.path.join(save_folder, 'adjusted_imgs'))
 
     # grayscale image (1 channel)
     if len(image_filenames) == 1:
         image = skimage.io.imread(image_filenames[0])  # read single channel image
         image = skimage.img_as_ubyte(image)            # cast to 8-bit
-        if adjust_hist:
-            image = imadjust(image)                    # adjust the histogram of the image
         image = np.stack((image for _ in range(3)), axis=2)  # change to np array rgb image
 
     # RGB image (3 channels)
@@ -48,8 +48,7 @@ def write_crops(save_folder, image_filenames, centers_filename, crop_size=[300, 
             im_ch = skimage.io.imread(image_filename)     # read each channel
             im_ch = skimage.img_as_ubyte(im_ch)           # cast to 8-bit
             img.append(im_ch)
-            if adjust_hist:
-                img[i] = imadjust(img[i])                               # adjust the histogram of the image
+
         if len(image_filenames) == 2:                                   # if two channels were provided
             img.append(np.zeros_like(img[0]))                           # set third channel to zero
         image = np.stack((im for im in img), axis=2)                    # change to np array rgb image
@@ -104,6 +103,11 @@ def write_crops(save_folder, image_filenames, centers_filename, crop_size=[300, 
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 skimage.io.imsave(os.path.join(save_folder, 'imgs', crop_name), np.squeeze(crop_img))   # save the image
+                if adjust_hist:
+                    adjusted_crop = np.copy(crop_img)           # create a new array on memory for adjusted crop
+                    adjusted_crop = imadjust(adjusted_crop)
+                    skimage.io.imsave(os.path.join(save_folder, 'adjusted_imgs', crop_name),
+                                      adjusted_crop)  # save the adjusted_image image
 
             # generate bounding boxes using segmentation
             crop_bbxs = GenerateBBoxfromSeeds(crop_img[:, :, 0], crop_centers)
@@ -125,7 +129,7 @@ def write_crops(save_folder, image_filenames, centers_filename, crop_size=[300, 
 
             # visualize bbxs
             if crop_idx < vis_idx:
-                visualize_bbxs(crop_img, centers=crop_centers, bbxs=crop_bbxs)
+                visualize_bbxs(crop_img, centers=crop_centers, bbxs=crop_bbxs, adjust_hist=adjust_hist)
 
             crop_idx = crop_idx + 1
 
