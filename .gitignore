@@ -103,7 +103,7 @@ ENV/
 .idea
 
 #protos py files
-*protos/*_pb2.py
+**/protos/*_pb2.py
 
 # project folders
 pretrained_models/*
