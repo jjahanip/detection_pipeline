@@ -2,11 +2,11 @@
 
 detection_pipeline is a tool for cell detection in large biomedical images with nuclei stained biomarker.
 
-![Alt text](files/whole_brain.png)
+![Alt text](files/1.png)
 
 Our goal is to perform large scale cell detection in an accurate and rubost manner.
 
-![Alt text](files/overview_result.png)
+![Alt text](files/2.png)
 
 # Dependencies:
 
@@ -15,7 +15,7 @@ Our goal is to perform large scale cell detection in an accurate and rubost mann
 * [Protobuf](https://github.com/google/protobuf/releases)
 
 # Installation:
-  1. Download Protobuf from [here]((https://github.com/google/protobuf/releases) and run the following command from ```lib``` directory:
+  1. Download Protobuf from [here](https://github.com/google/protobuf/releases) and run the following command from ```lib``` directory:
   ``` bash
   protoc object_detection/protos/*.proto --python_out=.
   ```
@@ -37,25 +37,43 @@ Our goal is to perform large scale cell detection in an accurate and rubost mann
 # Pipeline:
 
 ### 1. Create small crops from large images and centers:
-In order to train our model, we have to create small crops from the large image.
+Deep learning needs lots of samples (images in our case) to learn the  assigned task.
+Moreover, fitting large images in the GPU memory is a challenging task.
+To overcome these issues, we have to create small crops from the large image.
+
 ```write_crops.py``` read your large image and corresponding seeds from ```data/input_data``` directory and creates small crops
  with size ```crop_size``` and save crops and xml files in ```imgs``` and ```xmls``` folders in ```save_dir``` folder.
 ```bash
-python write_crops.py --images_dir=data/train_data/input_data --crop_size=300,300 --save_dir=data/train_data --adjust_image --visualize=2
+python write_crops.py --images_dir=data/train/input_data --crop_size=300,300 --save_dir=data/train --adjust_image --visualize=2
 ```
-![Alt text](files/img_xmls_dir.png)
+![Alt text](files/3.png)
+
 
  - You can use visualize if you want to see the first "n" crops to make sure everything is right.
- ![Alt text](files/crop_vis.png)
+   ![Alt text](files/4.png)
+
+
  - You can adjust the intensity of the image __for visualization__ using ```--image_adjust```.
- It will also create a new folder with intensity adjusted crops as ```adjusted_imgs```.
- ![Alt-text](files/crop_vis_2.png)
+    
+    ![Alt-text](files/5.png)
+
+ 
+   - It will also create a new folder with intensity adjusted crops as ```adjusted_imgs```.
+ 
+      ![Alt-text](files/6.png)
+ 
 
 
 ### 2. (optional) Fix bounding boxes using [LabelImg](https://github.com/tzutalin/labelImg)
 You can use [LabelImg](https://github.com/tzutalin/labelImg) software to correct the bounding boxes.
- ![Alt-text](files/labelImg.gif)
+ ![Alt-text](files/7.gif)
 
+After you updated the bounding boxes, you can create a new txt file corresponding to the bounding box information of all of the cells in the original image:
+
+```bash
+python update_bbxs.py --input_dir=data/xmls --output_file=/data/train/input_data/bbxs.txt
+```
+This will create a `bbxs.txt` file inside your `input_data` folder. You can use this file to generate the `tfrecord` file.
 ### 3. Generate tfrecord file from xmls and imgs
 After you created the crop images and corresponding xml files, you can generated the ```tfrecord``` file.
 ```tfrecord``` file is the input to your network.

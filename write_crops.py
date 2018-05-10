@@ -13,11 +13,11 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--input_dir', type=str, default='data/vehicle/input_data', help='path to the directory of input images and centers file')
+parser.add_argument('--input_dir', type=str, default='data/train/input_data', help='path to the directory of input images and centers file')
 parser.add_argument('--crop_size', type=str, default='300,300', help='size of the cropped image e.g. 300,300')
-parser.add_argument('--save_dir', type=str, default='data/vehicle', help='path to the folders of new images and xml files')
+parser.add_argument('--save_dir', type=str, default='data/train', help='path to the folders of new images and xml files')
 parser.add_argument('--adjust_image', action='store_true', help='adjust histogram of image')
-parser.add_argument('--visualize', type=int, default=20, help='visualize n sample images with bbxs')
+parser.add_argument('--visualize', type=int, default=2, help='visualize n sample images with bbxs')
 args = parser.parse_args()
 
 
@@ -129,7 +129,7 @@ def write_crops(save_folder, image_filenames, centers_filename, crop_size=[300, 
 
             # visualize bbxs
             if crop_idx < vis_idx:
-                visualize_bbxs(crop_img, centers=crop_centers, bbxs=crop_bbxs, adjust_hist=adjust_hist)
+                visualize_bbxs(crop_img, centers=crop_centers, bbxs=crop_bbxs, adjust_hist=adjust_hist, save=True)
 
             crop_idx = crop_idx + 1
 
