@@ -1,3 +1,6 @@
+# A simplied version of Segmentation functions , source from CellSegmentationfcts_hierarchy.py #
+# This function works well only for small crops
+
 import skimage
 from skimage import filters, morphology, measure, feature
 from scipy import ndimage
