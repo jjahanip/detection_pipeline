@@ -12,7 +12,7 @@ Crop the images, create the local xml files in cropped/xml,cropped/img
 
 
 
-@author: xli63
+@author: Xiaoyang.Rebecca.Li@gmail.com
 """
 
 import os
