@@ -8,6 +8,7 @@ import warnings
 from lib.ops import write_xml, check_path
 from lib.image_uitls import *
 from lib.segmentation import GenerateBBoxfromSeeds
+import pandas as pd
 
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
@@ -17,7 +18,7 @@ parser.add_argument('--input_dir', type=str, default='data/train/input_data', he
 parser.add_argument('--crop_size', type=str, default='300,300', help='size of the cropped image e.g. 300,300')
 parser.add_argument('--save_dir', type=str, default='data/train', help='path to the folders of new images and xml files')
 parser.add_argument('--adjust_image', action='store_true', help='adjust histogram of image')
-parser.add_argument('--visualize', type=int, default=2, help='visualize n sample images with bbxs')
+parser.add_argument('--visualize', type=int, default=20, help='visualize n sample images with bbxs')
 args = parser.parse_args()
 
 
@@ -56,9 +57,17 @@ def write_crops(save_folder, image_filenames, centers_filename, crop_size=[300, 
     # get image information
     img_rows, img_cols, img_ch = image.shape                            # img_rows = height , img_cols = width
 
-    # load centers
-    centers = np.loadtxt(centers_filename, skiprows=1)                  # load feature table
-    centers = centers[:, 1:3].astype(int) - 1                           # extract centers
+    # read table
+    table = pd.read_csv(centers_filename, sep='\t')
+
+    # read center coordinates
+    centers = table[['centroid_x', 'centroid_y']].values
+
+    # read bounding box coordinates
+    try:
+        bbxs = table[['xmin', 'ymin', 'xmax', 'ymax']].values
+    except KeyError:
+        bbxs = None
 
     # for each crop:
     crop_idx = 0
@@ -109,8 +118,20 @@ def write_crops(save_folder, image_filenames, centers_filename, crop_size=[300, 
                     skimage.io.imsave(os.path.join(save_folder, 'adjusted_imgs', crop_name),
                                       adjusted_crop)  # save the adjusted_image image
 
-            # generate bounding boxes using segmentation
-            crop_bbxs = GenerateBBoxfromSeeds(crop_img[:, :, 0], crop_centers)
+            # if user provides the bounding boxes
+            if bbxs is not None:
+                # extract bbxs in the crop
+                crop_bbxs = bbxs[(bbxs[:, 0] >= j) & (bbxs[:, 0] < j + crop_width) &
+                                 (bbxs[:, 2] >= j) & (bbxs[:, 2] < j + crop_width) &
+                                 (bbxs[:, 1] >= i) & (bbxs[:, 1] < i + crop_height) &
+                                 (bbxs[:, 3] >= i) & (bbxs[:, 3] < i + crop_height)]
+
+                # shift the x & y values based on crop size
+                crop_bbxs[:, [0, 2]] = crop_bbxs[:, [0, 2]] - j
+                crop_bbxs[:, [1, 3]] = crop_bbxs[:, [1, 3]] - i
+            else:
+                # generate bounding boxes using segmentation
+                crop_bbxs = GenerateBBoxfromSeeds(crop_img[:, :, 0], crop_centers)
 
             # remove bbxs with width <10 or height<10
             crop_bbxs = crop_bbxs[(crop_bbxs[:, 2] - crop_bbxs[:, 0] > 10) &
