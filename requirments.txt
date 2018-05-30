@@ -2,3 +2,4 @@ numpy
 scikit-image
 pandas
 progressbar2
+matplotlib

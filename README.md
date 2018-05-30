@@ -15,24 +15,30 @@ Our goal is to perform large scale cell detection in an accurate and rubost mann
 * [Protobuf](https://github.com/google/protobuf/releases)
 
 # Installation:
-  1. Download Protobuf from [here](https://github.com/google/protobuf/releases) and run the following command from ```lib``` directory:
+####1. Download Protobuf from [here](https://github.com/google/protobuf/releases) and run the following command from ```lib``` directory:
+``` bash
+protoc object_detection/protos/*.proto --python_out=.
+```
+__*NOTE:__ Make sure the executable folder is added to your path variable:
+
+(__for Windows__):
+```
+# From Protoc*/bin
+SET PATH=%PATH%;%cd%
+```
+
+(__for Linux and Mac__):
+```bash
+# From Protoc*/bin
+export PATH=$PATH:`pwd`
+```
+
+####2. Install TensorFlow library. Follow the instructions from [here](https://www.tensorflow.org/install/). 
+  
+####3. Install required libraries:
   ``` bash
-  protoc object_detection/protos/*.proto --python_out=.
+  pip install -r requirments.txt
   ```
-  __*NOTE:__ Make sure the executable folder is added to your path variable:
-
-  (__for Windows__):
-  ```
-  # From Protoc*/bin
-  SET PATH=%PATH%;%cd%
-  ```
-
-  (__for Linux and Mac__):
-  ```bash
-  # From Protoc*/bin
-  export PATH=$PATH:`pwd`
-  ```
-
 
 # Pipeline:
 
