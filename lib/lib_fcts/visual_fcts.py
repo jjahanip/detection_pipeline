@@ -165,14 +165,19 @@ def extractFileNamesforType(dir_loc, fileExt):   # dir , '.tif'
     return fileNames
            
 def visualize(img,labels = [],seeds_marker = [],seeds_marker_2 = []):  
-# img: grayscale images 
-# labels : 
+# img: grayscale images (only to extract the size)
+# labels :  (segmentation image)
 #    labeled image: 0: backgourd, 
 #                   1,2,3... : components ID  
-# seeds_markered images = seeds for disk(3) 
-#filledCell,seeds_marker,labels
+#
+# seeds_markered: (seeds image, default : disk radius size 3)                     
+#    seeds_markered image: 0: backgourd, 
+#                   1,2,3... : seeds ID
+# e.g. 
+# seeds_marker, labels, __,__ = CellSegmentationfcts_hierarchy.watershedSegmentation( IMG, blobs=[])
+# img_disp = visualize(IMG ,label , seeds_marker,seeds_marker_2=[] )    
+# plt.imshow(img_disp)
 
-## visualize the result of blobs to adjust parameters     
 	
     img_adj = skimage.img_as_float(img)
     img_adj =  exposure.rescale_intensity(img_adj)
