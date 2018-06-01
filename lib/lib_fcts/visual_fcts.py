@@ -165,7 +165,15 @@ def extractFileNamesforType(dir_loc, fileExt):   # dir , '.tif'
     return fileNames
            
 def visualize(img,labels = [],seeds_marker = [],seeds_marker_2 = []):  
-    
+# img: grayscale images 
+# labels : 
+#    labeled image: 0: backgourd, 
+#                   1,2,3... : components ID  
+# seeds_markered images = seeds for disk(3) 
+#filledCell,seeds_marker,labels
+
+## visualize the result of blobs to adjust parameters     
+	
     img_adj = skimage.img_as_float(img)
     img_adj =  exposure.rescale_intensity(img_adj)
     img_disp = cv2.merge((img_adj,img_adj,img_adj))
