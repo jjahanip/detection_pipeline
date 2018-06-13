@@ -13,19 +13,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
-parser = argparse.ArgumentParser()
-parser.add_argument('--input_dir', type=str, default='data/train/input_data', help='path to the directory of input images and centers file')
-parser.add_argument('--crop_size', type=str, default='300,300', help='size of the cropped image e.g. 300,300')
-parser.add_argument('--save_dir', type=str, default='data/train', help='path to the folders of new images and xml files')
-parser.add_argument('--adjust_image', action='store_true', help='adjust histogram of image')
-parser.add_argument('--visualize', type=int, default=20, help='visualize n sample images with bbxs')
-args = parser.parse_args()
 
-
-def write_crops(save_folder, image_filenames, centers_filename, crop_size=[300, 300], adjust_hist=False, vis_idx=0):
-
-    # crop width and height
-    crop_width, crop_height = crop_size
+def write_crops(save_folder, image, centers=None, bbxs=None, crop_size=[300, 300], adjust_hist=False, vis_idx=0):
 
     # check for subdirectories
     dir_list = os.listdir(save_folder)
@@ -36,38 +25,21 @@ def write_crops(save_folder, image_filenames, centers_filename, crop_size=[300, 
     if 'adjusted_imgs' not in dir_list and adjust_hist:
         os.mkdir(os.path.join(save_folder, 'adjusted_imgs'))
 
-    # grayscale image (1 channel)
-    if len(image_filenames) == 1:
-        image = skimage.io.imread(image_filenames[0])  # read single channel image
-        image = skimage.img_as_ubyte(image)            # cast to 8-bit
-        image = np.stack((image for _ in range(3)), axis=2)  # change to np array rgb image
-
-    # RGB image (3 channels)
-    if len(image_filenames) > 1:
-        img = []
-        for i, image_filename in enumerate(image_filenames):
-            im_ch = skimage.io.imread(image_filename)     # read each channel
-            im_ch = skimage.img_as_ubyte(im_ch)           # cast to 8-bit
-            img.append(im_ch)
-
-        if len(image_filenames) == 2:                                   # if two channels were provided
-            img.append(np.zeros_like(img[0]))                           # set third channel to zero
-        image = np.stack((im for im in img), axis=2)                    # change to np array rgb image
+    # crop width and height
+    crop_width, crop_height = crop_size
 
     # get image information
     img_rows, img_cols, img_ch = image.shape                            # img_rows = height , img_cols = width
 
-    # read table
-    table = pd.read_csv(centers_filename, sep='\t')
-
-    # read center coordinates
-    centers = table[['centroid_x', 'centroid_y']].values
-
-    # read bounding box coordinates
-    try:
-        bbxs = table[['xmin', 'ymin', 'xmax', 'ymax']].values
-    except KeyError:
-        bbxs = None
+    # 1. User provided the bounding boxes -> just generate the crops
+    if bbxs is not None:
+        centers = np.zeros((bbxs.shape[0], 2), dtype=int)
+        centers[:, 0] = np.round((bbxs[:, 0] + bbxs[:, 2]) / 2)
+        centers[:, 1] = np.round((bbxs[:, 1] + bbxs[:, 3]) / 2)
+    # 2. User didn't provide centers or bounding boxes -> whole image segmentation
+    elif centers is None and bbxs is None:
+        # to be added by generating full image segmentation
+        pass
 
     # for each crop:
     crop_idx = 0
@@ -86,7 +58,7 @@ def write_crops(save_folder, image_filenames, centers_filename, crop_size=[300, 
             # crop the image
             crop_img = image[i:crop_height + i, j:crop_width + j]   # create crop image
 
-            # of crop was on the edges, take the whole size of crop
+            # if crop was on the edges, take the whole size of crop
             if crop_img.shape[:2][::-1] != tuple(crop_size):
                 if crop_img.shape[:2][::-1] != tuple(crop_size):
                     # if both dims are at the end
@@ -156,19 +128,41 @@ def write_crops(save_folder, image_filenames, centers_filename, crop_size=[300, 
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--images_dir', type=str, default='data/train/input_data', help='path to the directory of input images')
+    parser.add_argument('--centers_file', type=str, default='data/train/input_data/centers.txt', help='path to the centers file to generate bounding boxes')
+    parser.add_argument('--bbxs_file', type=str, default='data/train/input_data/bbxs.txt', help='path to the bbxs file')
+    parser.add_argument('--crop_size', type=str, default='300,300', help='size of the cropped image e.g. 300,300')
+    parser.add_argument('--save_dir', type=str, default='data/train', help='path to the folders of new images and xml files')
+    parser.add_argument('--adjust_image', action='store_true', help='adjust histogram of image')
+    parser.add_argument('--visualize', type=int, default=2, help='visualize n sample images with bbxs')
+    args = parser.parse_args()
 
-    # read input
-    input_fnames = []
-    for file in os.listdir(args.input_dir):
+    # read images
+    imgs_fname = []
+    for file in os.listdir(args.images_dir):
         file_name, file_extension = os.path.splitext(file)
         if file_extension in ['.jpeg', '.jpg', '.bmp', '.tif', '.tiff', '.png']:
-            input_fnames.append(check_path(os.path.join(args.input_dir, file)))
-        if file_extension == '.txt':
-            centers_fname = check_path(os.path.join(args.input_dir, file))
-    assert len(input_fnames) <= 3, ('Provide no more than 3 images')
+            imgs_fname.append(check_path(os.path.join(args.images_dir, file)))
+    assert len(imgs_fname) <= 3, ('Provide no more than 3 images')
+    image = read_image_from_filenames(imgs_fname)
 
-    # read centers file
-    # centers_fname = args.centers_file
+    # read centers
+    if os.path.isfile(args.centers_file):
+        # read table
+        centers_table = pd.read_csv(args.centers_file, sep='\t')
+        # read center coordinates
+        centers = centers_table[['centroid_x', 'centroid_y']].values
+    else:
+        centers = None
+    # read bbxs
+    if os.path.isfile(args.bbxs_file):
+        # read table
+        bbxs_table = pd.read_csv(args.bbxs_file, sep='\t')
+        # read bbxs coordinates
+        bbxs = bbxs_table[['xmin', 'ymin', 'xmax', 'ymax']].values
+    else:
+        bbxs = None
 
     # read crop size
     crop_size = list(map(int, args.crop_size.split(',')))
@@ -184,7 +178,7 @@ def main():
 
 
 
-    write_crops(save_folder, input_fnames, centers_fname, crop_size=crop_size, adjust_hist=adjust_image, vis_idx=vis_idx)
+    write_crops(save_folder, image, centers=centers, bbxs=bbxs, crop_size=crop_size, adjust_hist=adjust_image, vis_idx=vis_idx)
     print('Successfully created the cropped images and corresponding xml files in:\n{}\n{}'
           .format(args.save_dir+'/imgs', args.save_dir+'/xmls'))
 

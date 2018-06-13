@@ -15,7 +15,7 @@ Our goal is to perform large scale cell detection in an accurate and rubost mann
 * [Protobuf](https://github.com/google/protobuf/releases)
 
 # Installation:
-####1. Download Protobuf from [here](https://github.com/google/protobuf/releases) and run the following command from ```lib``` directory:
+#### 1. Download Protobuf from [here](https://github.com/google/protobuf/releases) and run the following command from ```lib``` directory:
 ``` bash
 protoc object_detection/protos/*.proto --python_out=.
 ```
@@ -33,9 +33,9 @@ SET PATH=%PATH%;%cd%
 export PATH=$PATH:`pwd`
 ```
 
-####2. Install TensorFlow library. Follow the instructions from [here](https://www.tensorflow.org/install/). 
+#### 2. Install TensorFlow library. Follow the instructions from [here](https://www.tensorflow.org/install/). 
   
-####3. Install required libraries:
+#### 3. Install required libraries:
   ``` bash
   pip install -r requirments.txt
   ```
@@ -47,11 +47,28 @@ Deep learning needs lots of samples (images in our case) to learn the  assigned 
 Moreover, fitting large images in the GPU memory is a challenging task.
 To overcome these issues, we have to create small crops from the large image.
 
-```write_crops.py``` read your large image and corresponding seeds from ```data/input_data``` directory and creates small crops
+```write_crops.py``` read your large image ```data/input_data``` directory and creates small crops
  with size ```crop_size``` and save crops and xml files in ```imgs``` and ```xmls``` folders in ```save_dir``` folder.
+ 
+You have 3 options to generate `xmls`.
+- Generate seeds and bounding boxes from automatic segmentation:
 ```bash
 python write_crops.py --images_dir=data/train/input_data --crop_size=300,300 --save_dir=data/train --adjust_image --visualize=2
 ```
+
+- Generate bounding boxes from seeds using automatic segmentation:
+```bash
+python write_crops.py --images_dir=data/train/input_data --centers_file=data/train/input_data/centers.txt --crop_size=300,300 --save_dir=data/train --adjust_image --visualize=2
+```
+
+- Use bounding boxes provided by user:
+```bash
+python write_crops.py --images_dir=data/train/input_data --bbxs_file=data/train/input_data/bbxs.txt--crop_size=300,300 --save_dir=data/train --adjust_image --visualize=2
+```
+
+
+This function will create 3 folders in your `save_dir` path. 
+
 ![Alt text](files/3.png)
 
 
@@ -71,8 +88,9 @@ python write_crops.py --images_dir=data/train/input_data --crop_size=300,300 --s
 
 
 ### 2. (optional) Fix bounding boxes using [LabelImg](https://github.com/tzutalin/labelImg)
-You can use [LabelImg](https://github.com/tzutalin/labelImg) software to correct the bounding boxes.
- ![Alt-text](files/7.gif)
+If you generated the bounding boxes using automatic segmentation, it is suggested to use [LabelImg](https://github.com/tzutalin/labelImg) software to correct the bounding boxes.
+
+![Alt-text](files/7.gif)
 
 After you updated the bounding boxes, you can create a new txt file corresponding to the bounding box information of all of the cells in the original image:
 

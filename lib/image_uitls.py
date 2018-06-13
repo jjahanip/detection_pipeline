@@ -1,4 +1,5 @@
 import numpy as np
+import skimage
 import matplotlib.pylab as plt
 import matplotlib.patches as patches
 
@@ -34,6 +35,32 @@ def imadjust(image, tol=[0.01, 0.99]):
         for i in range(3):
             image[:,:,i] = adjust_single_channel(image[:, :, i], tol)
         return image
+
+def read_image_from_filenames(image_filenames, adjust_hist=False):
+
+    # grayscale image (1 channel)
+    if len(image_filenames) == 1:
+        image = skimage.io.imread(image_filenames[0])  # read single channel image
+        image = skimage.img_as_ubyte(image)  # cast to 8-bit
+        if adjust_hist:
+            image = imadjust(image)  # adjust the histogram of the image
+        image = np.stack((image for _ in range(3)), axis=2)  # change to np array rgb image
+
+    # RGB image (3 channels)
+    if len(image_filenames) > 1:
+        img = []
+        for i, image_filename in enumerate(image_filenames):
+            im_ch = skimage.io.imread(image_filename)  # read each channel
+            im_ch = skimage.img_as_ubyte(im_ch)  # cast to 8-bit
+            img.append(im_ch)
+            if adjust_hist:
+                img[i] = imadjust(img[i])  # adjust the histogram of the image
+        if len(image_filenames) == 2:  # if two channels were provided
+            img.append(np.zeros_like(img[0]))  # set third channel to zero
+        image = np.stack((im for im in img), axis=2)  # change to np array rgb image
+
+    return image
+
 
 def visualize_bbxs(image, centers=None, bbxs=None, save=False, adjust_hist=False):
     # adjust the histogram of the image
