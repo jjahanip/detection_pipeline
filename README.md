@@ -95,14 +95,14 @@ If you generated the bounding boxes using automatic segmentation, it is suggeste
 After you updated the bounding boxes, you can create a new txt file corresponding to the bounding box information of all of the cells in the original image:
 
 ```bash
-python update_bbxs.py --input_dir=data/xmls --output_file=/data/train/input_data/bbxs.txt
+python update_bbxs.py --input_dir=data/train/xmls --output_file=/data/train/input_data/bbxs.txt
 ```
 This will create a `bbxs.txt` file inside your `input_data` folder. You can use this file to generate the `tfrecord` file.
 ### 3. Generate tfrecord file from xmls and imgs
 After you created the crop images and corresponding xml files, you can generated the ```tfrecord``` file.
 ```tfrecord``` file is the input to your network.
 ```bash
-python generate_tfrecord.py --input_dir=data/train_data --output_path=data/train_data/train.record
+python generate_tfrecord.py --input_dir=data/train --output_path=data/train/train.record
 ```
 Create a label map for mapping classes to unique IDs. Create a ```nucleus_map.pbtxt``` file inside ```data``` folder and add following lines:
 ```vim

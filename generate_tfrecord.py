@@ -22,8 +22,8 @@ from collections import namedtuple, OrderedDict
 from lib.ops import xml_to_csv, check_path
 
 flags = tf.app.flags
-flags.DEFINE_string('input_dir', 'data', 'Path to parent folder containing "imgs" and "xmls" directories')
-flags.DEFINE_string('output_path', 'data/train.record', 'Path to output TFRecord file')
+flags.DEFINE_string('input_dir', 'data/train', 'Path to parent folder containing "imgs" and "xmls" directories')
+flags.DEFINE_string('output_path', 'data/train/train.record', 'Path to output TFRecord file')
 FLAGS = flags.FLAGS
 
 
