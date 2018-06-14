@@ -6,15 +6,8 @@ from lib.ops import non_max_suppression_fast
 from lib.ops import check_path
 
 
-parser = argparse.ArgumentParser()
-parser.add_argument('--xml_dir', type=str, default='data/xmls', help='path to the directory of xml files')
-parser.add_argument('--output_file', type=str, default='data/input_data/bbxs.txt', help='path to the output file name')
-args = parser.parse_args()
-
-
 def MergeUpdatedBboxs(xml_dir, output_file):
 
-    # all_centers = []
     bbxs = []
 
     for fname in os.listdir(xml_dir):
@@ -33,8 +26,9 @@ def MergeUpdatedBboxs(xml_dir, output_file):
 
             bbxs.append([xmin + x, ymin + y, xmax + x, ymax + y])
 
+    # TBD
     # remove overlapping bounding boxes due to cropping with overlap
-    bbxs = non_max_suppression_fast(np.array(bbxs), .5)
+    # bbxs = non_max_suppression_fast(np.array(bbxs), .5)
 
     # get centers
     centers = np.empty((bbxs.shape[0], 2), dtype=int)
@@ -54,6 +48,11 @@ def MergeUpdatedBboxs(xml_dir, output_file):
 
 
 if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--xml_dir', type=str, default='data/train/xmls', help='path to the directory of xml files')
+    parser.add_argument('--output_file', type=str, default='data/train/input_data/bbxs.txt', help='path to the output file name')
+    args = parser.parse_args()
 
     xml_dir = check_path(args.xml_dir)
     save_fname = check_path(args.output_file)
