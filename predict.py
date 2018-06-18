@@ -11,11 +11,11 @@ from lib.image_uitls import *
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--input_dir', type=str, default='data/test', help='path to the large input images direcotry')
-parser.add_argument('--crop_size', type=str, default='300,300', help='size of the cropped image e.g. 300,300')
-parser.add_argument('--model_dir', type=str, default='freezed_models/model1', help='path to exported model directory')
+parser.add_argument('--crop_size', type=str, default='2000,2000', help='size of the cropped image e.g. 300,300')
+parser.add_argument('--model_dir', type=str, default='freezed_models/NeuN_2000', help='path to exported model directory')
 parser.add_argument('--output_file', type=str, default='data/test/bbxs.txt', help='path to txt file of coordinates')
 parser.add_argument('--score_threshold', type=int, default=.5, help='threshold on keeping the bbxs ')
-parser.add_argument('--visualize_crop', type=int, default=0, help='visualize n sample images with bbxs')
+parser.add_argument('--visualize_crop', type=int, default=6, help='visualize n sample images with bbxs')
 parser.add_argument('--adjust_image', action='store_true',  help='adjust histogram of image for visualization')
 
 
@@ -217,9 +217,13 @@ def main():
 
         # keep the predictions higher than threshold
         keep_boxes = scores > args.score_threshold
+        # if no box found in the crop, continue
+        if not np.any(keep_boxes):
+            continue
+
+        # keep boxes higher than the threshold
         crop_features = crop_features[keep_boxes, :]
         boxes = boxes[keep_boxes, :]
-
 
         crop_bbxs = []
         for i, box in enumerate(boxes):
@@ -253,16 +257,33 @@ def main():
     sess.close()
 
     # remove overlapping bounding boxes due to cropping with overlap
-    bbxs = non_max_suppression_fast(np.array(bbxs), .5)
+    # bbxs = non_max_suppression_fast(np.array(bbxs), .5)
+
     # get centers
     centers = np.empty((bbxs.shape[0], 2), dtype=int)
     centers[:, 0] = np.rint((bbxs[:, 0] + bbxs[:, 2]) / 2).astype(int)
     centers[:, 1] = np.rint((bbxs[:, 1] + bbxs[:, 3]) / 2).astype(int)
 
-    table = np.hstack((centers, bbxs))
-    # save to the file
-    np.savetxt(args.output_file, table, fmt='%d\t%d\t%d\t%d\t%d\t%d',
-               header='centroid_x\tcentroid_y\txmin\tymin\txmax\tymax', comments='')
+    # create a column for unique IDs
+    ids = np.arange(1, bbxs.shape[0] + 1)
+
+    # create numpy array for the table
+    table = np.hstack((ids, centers, bbxs))
+
+    fmt = '\t'.join(['%d'] * table.shape[1])
+    hdr = '\t'.join(
+        ['ID'] + ['centroid_x'] + ['centroid_y'] + ['xmin'] + ['ymin'] + ['xmax'] + ['ymax'] +
+        ['f{}'.format(i) for i in range(1, crop_features.shape[1])])
+    cmts = ''
+
+    # check if output dir exist
+    if not os.path.isdir(os.path.dirname(args.output_file)):
+        os.makedirs(os.path.dirname(args.output_file))
+
+    # save table to output file
+    np.savetxt(args.output_file, table, fmt=fmt, header=hdr, comments=cmts)
+
+
 
 
 if __name__ == '__main__':

@@ -181,6 +181,12 @@ image_resizer {
    }
 }
 ```
+__NOTE__: Remember to make sure the `max_proposals` fits to your image size
+```bash
+first_stage_max_proposals: 
+max_detections_per_class: 
+max_total_detections: 
+```
 
 Now we can freeze the model with new configuration.
 ```bash
