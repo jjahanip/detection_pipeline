@@ -65,7 +65,7 @@ def read_image_from_filenames(image_filenames, adjust_hist=False):
 def visualize_bbxs(image, centers=None, bbxs=None, save=False, adjust_hist=False):
     # adjust the histogram of the image
     if adjust_hist:
-        image = imadjust(image)
+        image = imadjust(image, cmap='gray')
 
     fig = plt.figure()
     ax = fig.add_subplot(111)
