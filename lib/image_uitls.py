@@ -84,4 +84,57 @@ def visualize_bbxs(image, centers=None, bbxs=None, save=False, adjust_hist=False
         fig.savefig('visualized_image.png', bbox_inches='tight')
     else:
         plt.show()
-    
+
+def crop(images, topLeft, botRight, bbxs=None, centers=None):
+    '''
+    crop sets of images, centers and bbxs
+    :param images: list of np.array images
+    :param topLeft: [x_start, y_start]
+    :param centers: [x_end, y_end]
+    :param centers: np.array [centroid_x, centroid_y]
+    :param bbxs: np.array [xmin, ymin, xmax, ymax]
+    return: cropped_image, cropped_centers, cropped_bbxs
+    '''
+
+    cropped_images = images
+
+    [x_start, y_start] = topLeft
+    [x_end, y_end] = botRight
+
+    def crop_img(image, topLeft, botRight):
+        return image[topLeft[1]:botRight[1], topLeft[0]:botRight[0]]
+
+    if isinstance(images, list):
+
+        for i, image in enumerate(cropped_images):
+            cropped_images[i] = crop_img(image, topLeft, botRight)
+    else:
+        cropped_images = crop_img(cropped_images, topLeft, botRight)
+
+    if bbxs is not None:
+        cropped_bbxs = np.copy(bbxs)
+        cropped_bbxs = cropped_bbxs[(cropped_bbxs[:, 0] >= x_start) & (cropped_bbxs[:, 2] < x_end) &
+                                    (cropped_bbxs[:, 1] >= y_start) & (cropped_bbxs[:, 3] < y_end)]
+
+        cropped_bbxs[:, [0, 2]] -= x_start
+        cropped_bbxs[:, [1, 3]] -= y_start
+
+        # get centers
+        cropped_centers = np.empty((cropped_bbxs.shape[0], 2), dtype=int)
+        cropped_centers[:, 0] = np.rint((cropped_bbxs[:, 0] + cropped_bbxs[:, 2]) / 2).astype(int)
+        cropped_centers[:, 1] = np.rint((cropped_bbxs[:, 1] + cropped_bbxs[:, 3]) / 2).astype(int)
+
+        return cropped_images, cropped_bbxs, cropped_centers
+
+    return cropped_images
+
+    if centers is not None:
+        cropped_centers = np.copy(centers)
+        cropped_centers = cropped_centers[(cropped_centers[:, 0] >= x_start) & (cropped_centers[:, 0] < x_end) &
+                                          (cropped_centers[:, 1] >= y_start) & (cropped_centers[:, 1] < y_end)]
+
+        cropped_centers[:, 0] -= x_start
+        cropped_centers[:, 1] -= y_start
+
+        return cropped_images, cropped_centers
+
