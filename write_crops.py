@@ -1,6 +1,7 @@
 import os
 import sys
 import argparse
+import configparser
 
 import numpy as np
 import skimage.io
@@ -129,54 +130,50 @@ def write_crops(save_folder, image, centers=None, bbxs=None, crop_size=[300, 300
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--images_dir', type=str, default='data/train/input_data', help='path to the directory of input images')
-    parser.add_argument('--centers_file', type=str, default='data/train/input_data/centers.txt', help='path to the centers file to generate bounding boxes')
-    parser.add_argument('--bbxs_file', type=str, default='data/train/input_data/bbxs.txt', help='path to the bbxs file')
-    parser.add_argument('--crop_size', type=str, default='300,300', help='size of the cropped image e.g. 300,300')
-    parser.add_argument('--save_dir', type=str, default='data/train', help='path to the folders of new images and xml files')
-    parser.add_argument('--adjust_image', action='store_true', help='adjust histogram of image')
-    parser.add_argument('--visualize', type=int, default=2, help='visualize n sample images with bbxs')
+    parser.add_argument('--config_file', type=str, default='data/train/config.txt', help='path to the directory of config file')
     args = parser.parse_args()
 
+    configParser = configparser.RawConfigParser()
+    configParser.read(args.config_file)
+
+    config_path = os.path.dirname(args.config_file)
+
     # read images
-    imgs_fname = []
-    for file in os.listdir(args.images_dir):
-        file_name, file_extension = os.path.splitext(file)
-        if file_extension in ['.jpeg', '.jpg', '.bmp', '.tif', '.tiff', '.png']:
-            imgs_fname.append(check_path(os.path.join(args.images_dir, file)))
+    imgs_fname = [os.path.join(config_path, file) for file in list(dict(configParser.items('images')).values())]
     assert len(imgs_fname) <= 3, ('Provide no more than 3 images')
     image = read_image_from_filenames(imgs_fname)
 
     # read centers
-    if os.path.isfile(args.centers_file):
+    centers_file = configParser.get('centers', 'file')
+    if centers_file == '':
+        centers = None
+    else:
         # read table
-        centers_table = pd.read_csv(args.centers_file, sep='\t')
+        centers_table = pd.read_csv(os.path.join(config_path, centers_file), sep='\t')
         # read center coordinates
         centers = centers_table[['centroid_x', 'centroid_y']].values
-    else:
-        centers = None
+
     # read bbxs
-    if os.path.isfile(args.bbxs_file):
+    bbxs_file = configParser.get('bbxs', 'file')
+    if bbxs_file == '':
+        bbxs = None
+    else:
         # read table
-        bbxs_table = pd.read_csv(args.bbxs_file, sep='\t')
+        bbxs_table = pd.read_csv(os.path.join(config_path, bbxs_file), sep='\t')
         # read bbxs coordinates
         bbxs = bbxs_table[['xmin', 'ymin', 'xmax', 'ymax']].values
+
+    crop_size = configParser.get('crop_size', 'size')
+    crop_size = list(map(int, crop_size.split(',')))
+
+    if configParser.get('save_dir', 'path') == '':
+        save_folder = os.path.join(config_path, 'crops')
     else:
-        bbxs = None
+        save_folder = os.path.join(config_path, configParser.get('save_dir', 'path'))
 
-    # read crop size
-    crop_size = list(map(int, args.crop_size.split(',')))
+    adjust_image = bool(configParser.get('adjust_image', 'value'))
 
-    # read path to save imgs and xmls folders
-    save_folder = check_path(args.save_dir)
-
-    # read Boolean to adjust the image histogram
-    adjust_image = args.adjust_image
-
-    # read number of images to be visualized
-    vis_idx = args.visualize
-
-
+    vis_idx = int(configParser.get('visualize', 'value'))
 
     write_crops(save_folder, image, centers=centers, bbxs=bbxs, crop_size=crop_size, adjust_hist=adjust_image, vis_idx=vis_idx)
     print('Successfully created the cropped images and corresponding xml files in:\n{}\n{}'
