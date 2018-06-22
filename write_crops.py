@@ -17,6 +17,9 @@ import matplotlib.patches as patches
 
 def write_crops(save_folder, image, centers=None, bbxs=None, crop_size=[300, 300], adjust_hist=False, vis_idx=0):
 
+    if not os.path.isdir(save_folder):
+        os.mkdir(save_folder)
+
     # check for subdirectories
     dir_list = os.listdir(save_folder)
     if 'imgs' not in dir_list:
@@ -130,7 +133,7 @@ def write_crops(save_folder, image, centers=None, bbxs=None, crop_size=[300, 300
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config_file', type=str, default='data/train/config.txt', help='path to the directory of config file')
+    parser.add_argument('--config_file', type=str, default='data/crop/large_image/config.txt', help='path to the directory of config file')
     args = parser.parse_args()
 
     configParser = configparser.RawConfigParser()
