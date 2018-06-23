@@ -126,8 +126,6 @@ def crop(images, topLeft, botRight, bbxs=None, centers=None):
 
         return cropped_images, cropped_bbxs, cropped_centers
 
-    return cropped_images
-
     if centers is not None:
         cropped_centers = np.copy(centers)
         cropped_centers = cropped_centers[(cropped_centers[:, 0] >= x_start) & (cropped_centers[:, 0] < x_end) &
@@ -138,3 +136,4 @@ def crop(images, topLeft, botRight, bbxs=None, centers=None):
 
         return cropped_images, cropped_centers
 
+    return cropped_images
