@@ -89,7 +89,11 @@ def write_crops(save_folder, image, centers=None, bbxs=None, crop_size=[300, 300
                 warnings.simplefilter("ignore")
                 skimage.io.imsave(os.path.join(save_folder, 'imgs', crop_name), np.squeeze(crop_img))   # save the image
                 if adjust_hist:
-                    adjusted_crop = np.copy(crop_img)           # create a new array on memory for adjusted crop
+                    dapi = np.copy(crop_img[:, :, 0])
+                    histone = np.copy(crop_img[:, :, 1])
+                    adjusted_crop = dapi + histone
+
+                    # adjusted_crop = np.copy(crop_img)           # create a new array on memory for adjusted crop
                     adjusted_crop = imadjust(adjusted_crop)
                     skimage.io.imsave(os.path.join(save_folder, 'adjusted_imgs', crop_name),
                                       adjusted_crop)  # save the adjusted_image image
@@ -133,7 +137,7 @@ def write_crops(save_folder, image, centers=None, bbxs=None, crop_size=[300, 300
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config_file', type=str, default='data/crop/large_image/config.txt', help='path to the directory of config file')
+    parser.add_argument('--config_file', type=str, default='data/train/config.txt', help='path to the directory of config file')
     args = parser.parse_args()
 
     configParser = configparser.RawConfigParser()

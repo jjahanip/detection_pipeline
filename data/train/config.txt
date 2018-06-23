@@ -1,0 +1,30 @@
+# NOTE: put this file in the same directory with all other files
+# path to the directory of input images
+[images]
+1 : R2C0.tif
+2 : R2C1.tif
+3 : R2C3.tif
+
+# path to the centers file to generate bounding boxes
+[centers]
+file : centers.txt
+
+# path to the bbxs file
+[bbxs]
+file:
+
+# size of the cropped image e.g. 300,300
+[crop_size]
+size : 300,300
+
+# path to the folder of imgs and xmls folder (default:crops)
+[save_dir]
+path : crops
+
+# adjust histogram of image: leave empty for False
+[adjust_image]
+value : T
+
+# visualize n sample images with bbxs
+[visualize]
+value : 0

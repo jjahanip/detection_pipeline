@@ -50,22 +50,10 @@ To overcome these issues, we have to create small crops from the large image.
 ```write_crops.py``` read your large image ```data/input_data``` directory and creates small crops
  with size ```crop_size``` and save crops and xml files in ```imgs``` and ```xmls``` folders in ```save_dir``` folder.
  
-You have 3 options to generate `xmls`.
-- Generate seeds and bounding boxes from automatic segmentation:
+Generate crops using automatic segmentation with the config file:
 ```bash
-python write_crops.py --images_dir=data/train/input_data --crop_size=300,300 --save_dir=data/train --adjust_image --visualize=2
+python write_crops.py --config_file=data/train/config.txt
 ```
-
-- Generate bounding boxes from seeds using automatic segmentation:
-```bash
-python write_crops.py --images_dir=data/train/input_data --centers_file=data/train/input_data/centers.txt --crop_size=300,300 --save_dir=data/train --adjust_image --visualize=2
-```
-
-- Use bounding boxes provided by user:
-```bash
-python write_crops.py --images_dir=data/train/input_data --bbxs_file=data/train/input_data/bbxs.txt--crop_size=300,300 --save_dir=data/train --adjust_image --visualize=2
-```
-
 
 This function will create 3 folders in your `save_dir` path. 
 
@@ -73,10 +61,11 @@ This function will create 3 folders in your `save_dir` path.
 
 
  - You can use visualize if you want to see the first "n" crops to make sure everything is right.
+
    ![Alt text](files/4.png)
 
 
- - You can adjust the intensity of the image __for visualization__ using ```--image_adjust```.
+ - You can adjust the intensity of the image __for visualization__ using ```adjust_image```.
     
     ![Alt-text](files/5.png)
 
