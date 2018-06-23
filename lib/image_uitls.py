@@ -2,7 +2,8 @@ import numpy as np
 import skimage
 import matplotlib.pylab as plt
 import matplotlib.patches as patches
-
+from PIL import Image
+import PIL.ImageDraw as ImageDraw
 
 def imadjust(image, tol=[0.01, 0.99]):
     # img : input one-layer image (numpy array)
@@ -137,3 +138,20 @@ def crop(images, topLeft, botRight, bbxs=None, centers=None):
         return cropped_images, cropped_centers
 
     return cropped_images
+
+def bbxs_image(file_name, bbxs, image_size, color='red'):
+    '''
+    :param file_name: tifffile to be saved
+    :param bbxs: np.array [xmin ymin xmax ymax]
+    :param image_size: [width height]
+    :param color: bounding box color
+    :return:
+    '''
+    # create image for bounding boxes (works fine)
+    box_pil = Image.new('RGB', image_size)
+    box_draw = ImageDraw.Draw(box_pil)
+    for xmin, ymin, xmax, ymax in bbxs:
+        (left, right, top, bottom) = (xmin, xmax, ymin, ymax)
+        box_draw.line([(left, top), (left, bottom), (right, bottom),
+                       (right, top), (left, top)], width=2, fill=color)
+    box_pil.save(file_name)
