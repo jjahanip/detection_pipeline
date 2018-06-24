@@ -137,7 +137,7 @@ def write_crops(save_folder, image, centers=None, bbxs=None, crop_size=[300, 300
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config_file', type=str, default='data/train/config.txt', help='path to the directory of config file')
+    parser.add_argument('--config_file', type=str, default='data/train/hpc/config.txt', help='path to the directory of config file')
     args = parser.parse_args()
 
     configParser = configparser.RawConfigParser()
@@ -184,7 +184,7 @@ def main():
 
     write_crops(save_folder, image, centers=centers, bbxs=bbxs, crop_size=crop_size, adjust_hist=adjust_image, vis_idx=vis_idx)
     print('Successfully created the cropped images and corresponding xml files in:\n{}\n{}'
-          .format(args.save_dir+'/imgs', args.save_dir+'/xmls'))
+          .format(save_folder+'/imgs', args.save_dir+'/xmls'))
 
 
 if __name__ == '__main__':
