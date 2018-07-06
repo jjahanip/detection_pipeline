@@ -1,5 +1,6 @@
 import numpy as np
 import skimage
+import skimage.io
 import matplotlib.pylab as plt
 import matplotlib.patches as patches
 from PIL import Image
