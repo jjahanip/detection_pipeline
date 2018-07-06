@@ -37,12 +37,13 @@ def imadjust(image, tol=[0.01, 0.99]):
             image[:,:,i] = adjust_single_channel(image[:, :, i], tol)
         return image
 
-def read_image_from_filenames(image_filenames, adjust_hist=False):
+def read_image_from_filenames(image_filenames, to_ubyte=True, adjust_hist=False):
 
     # grayscale image (1 channel)
     if len(image_filenames) == 1:
         image = skimage.io.imread(image_filenames[0])  # read single channel image
-        image = skimage.img_as_ubyte(image)  # cast to 8-bit
+        if to_ubyte:
+            image = skimage.img_as_ubyte(image)  # cast to 8-bit
         if adjust_hist:
             image = imadjust(image)  # adjust the histogram of the image
         image = np.stack((image for _ in range(3)), axis=2)  # change to np array rgb image
@@ -52,7 +53,8 @@ def read_image_from_filenames(image_filenames, adjust_hist=False):
         img = []
         for i, image_filename in enumerate(image_filenames):
             im_ch = skimage.io.imread(image_filename)  # read each channel
-            im_ch = skimage.img_as_ubyte(im_ch)  # cast to 8-bit
+            if to_ubyte:
+                im_ch = skimage.img_as_ubyte(im_ch)  # cast to 8-bit
             img.append(im_ch)
             if adjust_hist:
                 img[i] = imadjust(img[i])  # adjust the histogram of the image
