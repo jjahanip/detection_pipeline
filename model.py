@@ -6,53 +6,45 @@ sys.path.append('lib/slim')
 import numpy as np
 import tensorflow as tf
 
-from object_detection.models import faster_rcnn_inception_resnet_v2_feature_extractor
-
 from google.protobuf import text_format
 from object_detection.protos import pipeline_pb2
 from object_detection.builders import model_builder
 from object_detection.core import standard_fields as fields
 
-from temp_exporter import _build_detection_graph
-from PIL import Image
-from lib.image_uitls import read_image_from_filenames
+from DataLoader import DataLoader
 
 
-# class JNet(faster_rcnn_inception_resnet_v2_feature_extractor):
-class JNet():
+class JNet(object):
+    def __init__(self, conf):
 
-    def __init__(self,
-                 test_config,
-                 trained_checkpoint,
-                 input_shape):
+        if conf.input_shape is None:
+            self.input_shape = (None, None, None, 3)
+        else:
+            self.input_shape = conf.input_shape
+        self.input = None
+        self.outputs = None
 
-        self.test_config = test_config
-        self.input_shape = input_shape
-        self.trained_checkpoint = trained_checkpoint
-
-        self.input_tensor = None
-        self.output_tensors = None
-        self.saver = None
-
+        self.conf = conf
         self.build_graph()
 
-    def get_model(self):
+    def build_graph(self):
         # read pipeline config
         pipeline_config = pipeline_pb2.TrainEvalPipelineConfig()
 
-        with tf.gfile.GFile(self.test_config, 'r') as f:
+        with tf.gfile.GFile(self.conf.pipeline_config_path, 'r') as f:
             text_format.Merge(f.read(), pipeline_config)
         text_format.Merge('', pipeline_config)
 
-        return model_builder.build(pipeline_config.model, is_training=False)
+        if self.conf.mode == 'test':
+            detection_model = model_builder.build(pipeline_config.model, is_training=False)
+            self.build_test_graph(detection_model)
 
-    def get_input_tensor(self):
-        if self.input_shape is None:
-            self.input_shape = (None, None, None, 3)
-        return tf.placeholder(dtype=tf.float32, shape=self.input_shape, name='image_tensor')
+        self.saver = tf.train.Saver()
 
-    def get_output_tensors_from_input(self, input_tensor, detection_model):
-        preprocessed_inputs, true_image_shapes = detection_model.preprocess(input_tensor)
+
+    def build_test_graph(self, detection_model):
+        self.input = tf.placeholder(dtype=tf.float32, shape=self.input_shape, name='input')
+        preprocessed_inputs, true_image_shapes = detection_model.preprocess(self.input)
         output_tensors = detection_model.predict(preprocessed_inputs, true_image_shapes)
         postprocessed_tensors = detection_model.postprocess(output_tensors, true_image_shapes)
 
@@ -79,16 +71,17 @@ class JNet():
         for output_key in outputs:
             tf.add_to_collection('inference_op', outputs[output_key])
 
-        return outputs
+        self.outputs = outputs
 
-    def build_graph(self):
+    def test(self):
+        data = DataLoader(self.conf)
 
-        detection_model = self.get_model()
-
-        self.input_tensor = self.get_input_tensor()
-        self.output_tensors = self.get_output_tensors_from_input(self.input_tensor, detection_model)
-
-        self.saver = tf.train.Saver()
+        config = tf.ConfigProto()
+        config.gpu_options.allow_growth = True
+        with tf.Session(config=config) as sess:
+            self.saver.restore(sess, self.conf.trained_checkpoint)
+            for batch in data.next_batch():
+                return sess.run(self.outputs, feed_dict={self.input: input})
 
 
 def main():
