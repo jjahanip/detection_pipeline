@@ -62,27 +62,11 @@ def write_crops(save_folder, image, centers=None, bbxs=None, crop_size=[300, 300
             # crop the image
             crop_img = image[i:crop_height + i, j:crop_width + j]   # create crop image
 
-            # if crop was on the edges, take the whole size of crop
-            if crop_img.shape[:2][::-1] != tuple(crop_size):
-                if crop_img.shape[:2][::-1] != tuple(crop_size):
-                    # if both dims are at the end
-                    if np.all(crop_img.shape[:2][::-1] != np.array(crop_size)):
-                        crop_img = image[-crop_height:, -crop_width:, :]
-                        i = img_rows - crop_height
-                        j = img_cols - crop_width
-                    # if xdim is at the end
-                    if crop_img.shape[:2][::-1][0] != tuple(crop_size)[0]:
-                        crop_img = image[i:i + crop_height, -crop_width:, :]
-                        j = img_cols - crop_width
-                    # if ydim is at the end
-                    if crop_img.shape[:2][::-1][1] != tuple(crop_size)[1]:
-                        crop_img = image[-crop_height:, j:j + crop_width, :]
-                        i = img_rows - crop_height
-                crop_centers = centers[(centers[:, 0] >= j) & (centers[:, 0] < j + crop_width) &
-                                       (centers[:, 1] >= i) & (centers[:, 1] < i + crop_height)]
-                # shift the x & y values based on crop size
-                crop_centers[:, 0] = crop_centers[:, 0] - j
-                crop_centers[:, 1] = crop_centers[:, 1] - i
+            # if we were at the edges of the image, zero pad the crop
+            if crop_img.shape[:2][::-1] != crop_size:
+                temp = np.copy(crop_img)
+                crop_img = np.zeros((crop_height, crop_width, crop_img.shape[2]))
+                crop_img[:temp.shape[0], :temp.shape[1], :] = temp
 
             crop_name = str(i) + '_' + str(j) + '.jpeg'             # filename contains x & y coords of top left corner
             with warnings.catch_warnings():

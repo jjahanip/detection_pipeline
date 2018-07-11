@@ -26,26 +26,8 @@ def get_crop(image_filenames, crop_size=[300, 300], adjust_hist=False):
     # crop width and height
     crop_width, crop_height = crop_size
 
-    # grayscale image (1 channel)
-    if len(image_filenames) == 1:
-        image = skimage.io.imread(image_filenames[0])  # read single channel image
-        image = skimage.img_as_ubyte(image)  # cast to 8-bit
-        if adjust_hist:
-            image = imadjust(image)  # adjust the histogram of the image
-        image = np.stack((image for _ in range(3)), axis=2)  # change to np array rgb image
-
-    # RGB image (3 channels)
-    if len(image_filenames) > 1:
-        img = []
-        for i, image_filename in enumerate(image_filenames):
-            im_ch = skimage.io.imread(image_filename)  # read each channel
-            im_ch = skimage.img_as_ubyte(im_ch)  # cast to 8-bit
-            img.append(im_ch)
-            if adjust_hist:
-                img[i] = imadjust(img[i])  # adjust the histogram of the image
-        if len(image_filenames) == 2:  # if two channels were provided
-            img.append(np.zeros_like(img[0]))  # set third channel to zero
-        image = np.stack((im for im in img), axis=2)  # change to np array rgb image
+    # read images
+    image = read_image_from_filenames(image_filenames)
 
     # get image information
     img_rows, img_cols, img_ch = image.shape  # img_rows = height , img_cols = width
@@ -62,22 +44,12 @@ def get_crop(image_filenames, crop_size=[300, 300], adjust_hist=False):
                 bar.update(crop_count)
                 # crop the image
                 crop_img = image[i:i + crop_height, j:j + crop_width, :]   # create crop image
-                # if we were at the edges of the image
-                # crop new image with the size of crop from the end of image
-                if crop_img.shape[:2][::-1] != tuple(crop_size):
-                    # if both dims are at the end
-                    if np.all(crop_img.shape[:2][::-1] != np.array(crop_size)):
-                        crop_img = image[-crop_height:, -crop_width:, :]
-                        i = img_rows - crop_height
-                        j = img_cols - crop_width
-                    # if xdim is at the end
-                    if crop_img.shape[:2][::-1][0] != tuple(crop_size)[0]:
-                        crop_img = image[i:i + crop_height, -crop_width:, :]
-                        j = img_cols - crop_width
-                    # if ydim is at the end
-                    if crop_img.shape[:2][::-1][1] != tuple(crop_size)[1]:
-                        crop_img = image[-crop_height:, j:j + crop_width, :]
-                        i = img_rows - crop_height
+
+                # if we were at the edges of the image, zero pad the crop
+                if crop_img.shape[:2][::-1] != crop_size:
+                    temp = np.copy(crop_img)
+                    crop_img = np.zeros((crop_height, crop_width, crop_img.shape[2]))
+                    crop_img[:temp.shape[0], :temp.shape[1], :] = temp
 
                 crop_count = crop_count + 1
 
