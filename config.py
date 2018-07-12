@@ -19,35 +19,12 @@ flags.DEFINE_integer('channel', 3, 'Network input channel size')
 flags.DEFINE_string('img_1', 'data/test/hpc_crop/R2C0_crop_crop.tif', 'image 1 path')
 flags.DEFINE_string('img_2', 'data/test/hpc_crop/R2C1_crop_crop.tif', 'image 2 path')
 flags.DEFINE_string('img_3', 'data/test/hpc_crop/R2C3_crop_crop.tif', 'image 3 path')
+flags.DEFINE_integer('crop_overlap', 25, 'Network input channel size')
 
-# Training logs
-flags.DEFINE_integer('max_step', 100000, '# of step for training')
-flags.DEFINE_integer('SAVE_FREQ', 1000, 'Number of steps to save model')
-flags.DEFINE_integer('SUMMARY_FREQ', 100, 'Number of step to save summary')
-flags.DEFINE_integer('VAL_FREQ', 500, 'Number of step to evaluate the network on Validation data')
-
-
-# For training
-flags.DEFINE_integer('batch_size', 128, 'training batch size')
-flags.DEFINE_integer('val_batch_size', 100, 'validation batch size')
-flags.DEFINE_float('init_lr', 1e-3, 'Initial learning rate')
-flags.DEFINE_float('lr_min', 1e-5, 'Minimum learning rate')
-
-# Directories
-flags.DEFINE_string('run_name', 'run2', 'Run name')
-flags.DEFINE_string('logdir', './Results/log_dir/', 'Logs directory')
-flags.DEFINE_string('modeldir', './Results/model_dir/', 'Saved models directory')
-flags.DEFINE_string('savedir', './Results/result/', 'Results saving directory')
-
-flags.DEFINE_string('model_name', 'model', 'Model file name')
-flags.DEFINE_integer('reload_step', 0, 'Reload step to continue training')
-
-# network architecture
-flags.DEFINE_integer('num_cls', 10, 'Number of output classes')
-flags.DEFINE_integer('digit_caps_dim', 16, 'Dimension of the DigitCaps')
-flags.DEFINE_integer('h1', 512, 'Number of hidden units of the first FC layer of the reconstruction network')
-flags.DEFINE_integer('h2', 1024, 'Number of hidden units of the second FC layer of the reconstruction network')
-
+# Network paramteres
+flags.DEFINE_integer('batch_size', 5, 'training batch size')
+flags.DEFINE_float('score_threshold', .4, 'Threshold of score of detection box')
+flags.DEFINE_integer('max_proposal', 400, 'maximum proposal per image')
 
 
 args = tf.app.flags.FLAGS

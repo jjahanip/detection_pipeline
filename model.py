@@ -13,6 +13,9 @@ from object_detection.core import standard_fields as fields
 
 from DataLoader import DataLoader
 
+from lib.image_uitls import visualize_bbxs, bbxs_image
+import progressbar
+
 
 class JNet(object):
     def __init__(self, conf):
@@ -21,10 +24,13 @@ class JNet(object):
             self.input_shape = (None, None, None, 3)
         else:
             self.input_shape = conf.input_shape
+
+
+        self.conf = conf
+
         self.input = None
         self.outputs = None
 
-        self.conf = conf
         self.build_graph()
 
     def build_graph(self):
@@ -34,6 +40,14 @@ class JNet(object):
         with tf.gfile.GFile(self.conf.pipeline_config_path, 'r') as f:
             text_format.Merge(f.read(), pipeline_config)
         text_format.Merge('', pipeline_config)
+
+        # check to make sure
+        pipeline_config.model.faster_rcnn.image_resizer.fixed_shape_resizer.height = self.conf.height
+        pipeline_config.model.faster_rcnn.image_resizer.fixed_shape_resizer.width = self.conf.width
+
+        pipeline_config.model.faster_rcnn.first_stage_max_proposals = self.conf.max_proposal
+        pipeline_config.model.faster_rcnn.second_stage_post_processing.batch_non_max_suppression.max_detections_per_class = self.conf.max_proposal
+        pipeline_config.model.faster_rcnn.second_stage_post_processing.batch_non_max_suppression.max_total_detections = self.conf.max_proposal
 
         if self.conf.mode == 'test':
             detection_model = model_builder.build(pipeline_config.model, is_training=False)
@@ -73,6 +87,22 @@ class JNet(object):
 
         self.outputs = outputs
 
+    def safe_run(self, sess, feed_dict=None, output_tensor=None):
+
+        try:
+            out_dict = sess.run(output_tensor, feed_dict=feed_dict)
+        except Exception as e:
+            if type(e).__name__ == 'ResourceExhaustedError':
+                print('Ran out of memory !')
+                print('decrease the batch size')
+                sys.exit(-1)
+            else:
+                print('Error in running session:')
+                print(e.message)
+                sys.exit(-1)
+
+        return out_dict
+
     def test(self):
         data = DataLoader(self.conf)
 
@@ -80,56 +110,55 @@ class JNet(object):
         config.gpu_options.allow_growth = True
         with tf.Session(config=config) as sess:
             self.saver.restore(sess, self.conf.trained_checkpoint)
-            for batch in data.next_batch():
-                return sess.run(self.outputs, feed_dict={self.input: input})
 
+            max_bar = np.prod(data.image.shape[:2] // (np.array([data.height, data.width]) - data.ovrlp) + 1)\
+                      // data.batch_size + 1
+            bar = progressbar.ProgressBar(max_value=max_bar)
+            crop_gen = data.next_crop()
+            iterate = True
+            while iterate:
+                bar.update(bar.value + 1)
 
-def main():
+                # make np arrays for generator
+                batch_x = np.empty(shape=(data.batch_size, data.height, data.width, data.channel))
+                corner = np.empty(shape=(data.batch_size, 2))
 
-    # args
-    pipeline_config_path = r'training/NeuN/test_300.config'
-    trained_checkpoint_prefix = r'training/NeuN/model.ckpt-200000'
-    input_shape = None
-    PATH_TO_TEST_IMAGES_DIR = r'test_images'
+                try:
+                    for i in range(data.batch_size):
+                        corner[i, :], batch_x[i, :, :, :] = next(crop_gen)
+                except StopIteration:
+                    iterate = False
 
-    jNet = JNet(test_config=pipeline_config_path,
-                trained_checkpoint=trained_checkpoint_prefix,
-                input_shape=input_shape)
+                # temp
+                batch_x = batch_x / 256
 
+                out_dict = self.safe_run(sess, feed_dict={self.input: batch_x}, output_tensor=self.outputs)
 
-    # read image:
-    TEST_IMAGE_PATHS = [os.path.join(PATH_TO_TEST_IMAGES_DIR, test_image) for test_image in
-                        os.listdir(PATH_TO_TEST_IMAGES_DIR)]
-    image_np = read_image_from_filenames(TEST_IMAGE_PATHS, to_ubyte=False).astype(float)
-    image_np = image_np / 255
-    image_np = image_np[1000:1300, 1000:1300, :]
-    # image_np = load_image_into_numpy_array(image)
-    image_np = np.expand_dims(image_np, axis=0)
+                for i in range(data.batch_size):
+                    keep_boxes = out_dict["detection_scores"][i, :] > self.conf.score_threshold
 
-    # run session
-    with tf.Session() as sess:
-        jNet.saver.restore(sess, 'training/NeuN/model.ckpt-200000')
-        out_dict = sess.run(jNet.output_tensors, feed_dict={'image_tensor:0': image_np})
-        prop_class_feat = sess.run('SecondStageFeatureExtractor/InceptionResnetV2/Conv2d_7b_1x1/Relu:0',
-                                   feed_dict={'image_tensor:0': image_np})
+                    if not np.any(keep_boxes):
+                        continue
 
-    # visualize
-    from lib.image_uitls import visualize_bbxs
-    keep_boxes = out_dict["detection_scores"] > .5
-    boxes = out_dict["detection_boxes"][keep_boxes, :]
-    crop_bbxs = []
-    crop_size = [300, 300]
-    for i, box in enumerate(boxes):
-        box = box.tolist()
-        ymin, xmin, ymax, xmax = box
+                    box = out_dict["detection_boxes"][i, :][keep_boxes]
+                    box = box[:, [1, 0, 3, 2]]      # reformat to: xmin, ymin, xmax, ymax
+                    # rescale from [0-1] to the crop size
+                    box[:, [0, 2]] = box[:, [0, 2]] * self.conf.width
+                    box[:, [1, 3]] = box[:, [1, 3]] * self.conf.height
 
-        # for crop visualization
-        crop_bbxs.append([xmin * crop_size[0],
-                          ymin * crop_size[1],
-                          xmax * crop_size[0],
-                          ymax * crop_size[1]])
-    visualize_bbxs(np.squeeze(image_np / 255), bbxs=np.array(crop_bbxs))
+                    # remove very large bounding boxes
+                    box = box[(box[:, 2] - box[:, 0] < 100) | (box[:, 3] - box[:, 1] < 100), :]
+                    if box.size == 0:    # if no bounding box after removing large ones
+                        continue
 
-if __name__ == '__main__':
-    main()
-    print()
+                    # visualize_bbxs(batch_x[i, :, :, :].astype('uint8'), bbxs=box, adjust_hist=True)
+
+                    box[:, [0, 2]] += corner[i][0]
+                    box[:, [1, 3]] += corner[i][1]
+
+                    data.bbxs.append(box.astype(int))
+
+        # to be added: non-max suppression
+        # to be added: rotate crop
+        data.bbxs = np.concatenate(data.bbxs)
+        bbxs_image('data/test/hpc_crop/bbxs_oop.tif', data.bbxs, (6000, 4000), color='red')

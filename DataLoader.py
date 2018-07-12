@@ -14,35 +14,31 @@ class DataLoader(object):
         self.batch_size = cfg.batch_size
         self.height = cfg.height
         self.width = cfg.width
-
+        self.channel = cfg.channel
+        self.ovrlp = cfg.crop_overlap
         self.image = read_image_from_filenames([cfg.img_1, cfg.img_2, cfg.img_3], to_ubyte=False)
 
-    def next_batch(self):
+        if cfg.mode == 'test':
+            self.bbxs = []
+
+    def next_crop(self):
 
         # get image information
         img_rows, img_cols, img_ch = self.image.shape  # img_rows = height , img_cols = width
         crop_size = (self.width, self.height)
-        # overlap between crops
-        ovrlp = 50
-        crop_count = 0
 
-        max_bar = (img_rows // (self.height - ovrlp) + 1) * (img_cols // (self.width - ovrlp) + 1)
-        with progressbar.ProgressBar(max_value=max_bar) as bar:
-            # get each crop
-            for i in range(0, img_rows, self.height - ovrlp):
-                for j in range(0, img_cols, self.width - ovrlp):
-                    bar.update(crop_count)
-                    # crop the image
-                    crop_img = self.image[i:i + self.height, j:j + self.width, :]  # create crop image
-                    # if we were at the edges of the image, zero pad the crop
-                    if crop_img.shape[:2][::-1] != crop_size:
-                        temp = np.copy(crop_img)
-                        crop_img = np.zeros((self.height, self.width, 3))
-                        crop_img[:temp.shape[0], :temp.shape[1], :] = temp
+        # get each crop
+        for i in range(0, img_rows, self.height - self.ovrlp):
+            for j in range(0, img_cols, self.width - self.ovrlp):
+                # crop the image
+                crop_img = self.image[i:i + self.height, j:j + self.width, :]  # create crop image
+                # if we were at the edges of the image, zero pad the crop
+                if crop_img.shape[:2][::-1] != crop_size:
+                    temp = np.copy(crop_img)
+                    crop_img = np.zeros((self.height, self.width, 3))
+                    crop_img[:temp.shape[0], :temp.shape[1], :] = temp
 
-                    crop_count = crop_count + 1
-
-                    yield [j, i], crop_img
+                yield [j, i], crop_img
 
         # if self.augment:
         #     x = random_rotation_2d(x, self.cfg.max_angle)
