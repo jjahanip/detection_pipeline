@@ -75,7 +75,27 @@ class DataLoader(object):
     def scores(self, value):
         self._scores = value
 
+    def remove_close_centers(self, radius=3):
+        # get groups of centers
+        tree = spatial.cKDTree(self._centers)
+        groups = tree.query_ball_point(self._centers, radius)
 
+        # remove isolated and duplicated centers
+        groups = [group for group in groups if len(group) > 1]
+        groups = np.unique(groups, axis=0)
+
+        # remove the center with highest probability and add to to_be_removed list
+        to_be_removed = []
+        for i, group in enumerate(groups):
+            max_idx = np.argmax(self._scores[group])
+            to_be_removed.append(np.delete(groups[i], max_idx))
+
+        # remove extra centers and update centers, bbxs and scores
+        to_be_removed = np.unique(to_be_removed)
+
+        # update bbxs, centers and scores
+        self.bbxs = np.delete(self._bbxs, to_be_removed, axis=0)
+        self._scores = np.delete(self._scores, to_be_removed, axis=0)
 
     def non_max_suppression_fast(self, overlapThresh):
         # Malisiewicz et al.
