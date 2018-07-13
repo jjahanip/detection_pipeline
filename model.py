@@ -4,6 +4,7 @@ sys.path.append('lib')
 sys.path.append('lib/slim')
 
 import numpy as np
+import progressbar
 import tensorflow as tf
 
 from google.protobuf import text_format
@@ -13,8 +14,8 @@ from object_detection.core import standard_fields as fields
 
 from DataLoader import DataLoader
 
-from lib.image_uitls import visualize_bbxs, bbxs_image
-import progressbar
+from lib.image_uitls import visualize_bbxs, bbxs_image, center_image
+from lib.ops import non_max_suppression_fast
 
 
 class JNet(object):
@@ -24,7 +25,6 @@ class JNet(object):
             self.input_shape = (None, None, None, 3)
         else:
             self.input_shape = conf.input_shape
-
 
         self.conf = conf
 
@@ -158,7 +158,20 @@ class JNet(object):
 
                     data.bbxs.append(box.astype(int))
 
+                    # score
+                    score = out_dict["detection_scores"][i, :][keep_boxes]
+                    data.scores.append(score)
+
+        bar.finish()
         # to be added: non-max suppression
         # to be added: rotate crop
         data.bbxs = np.concatenate(data.bbxs)
-        bbxs_image('data/test/hpc_crop/bbxs_oop.tif', data.bbxs, (6000, 4000), color='red')
+        data.scores = np.concatenate(data.scores)
+
+        data.bbxs = non_max_suppression_fast(data.bbxs, self.conf.nms_iou)
+        data.centers = data.get_centers()
+
+        # bbxs_image('data/test/hpc_crop/bbxs_nms_tf.tif', data.bbxs, (6000, 4000), color='red')
+        bbxs_image('data/test/hpc_crop/bbxs.tif', data.bbxs, (6000, 4000))
+        center_image('data/test/hpc_crop/centers.tif', data.centers, (6000, 4000))
+
