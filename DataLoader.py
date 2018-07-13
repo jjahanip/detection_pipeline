@@ -1,7 +1,7 @@
 import random
 import scipy
 import numpy as np
-import progressbar
+import scipy.spatial as spatial
 
 from lib.image_uitls import read_image_from_filenames
 
@@ -18,10 +18,9 @@ class DataLoader(object):
         self.ovrlp = cfg.crop_overlap
         self.image = read_image_from_filenames([cfg.img_1, cfg.img_2, cfg.img_3], to_ubyte=False)
 
-        if cfg.mode == 'test':
-            self.centers = []
-            self.bbxs = []
-            self.scores = []
+        self._centers = None
+        self._bbxs = None
+        self._scores = None
 
     def next_crop(self):
 
@@ -42,18 +41,46 @@ class DataLoader(object):
 
                 yield [j, i], crop_img
 
-    def get_centers(self):
-        self.centers = np.empty((self.bbxs.shape[0], 2), dtype=int)
-        self.centers[:, 0] = (self.bbxs[:, 0] + self.bbxs[:, 2]) // 2
-        self.centers[:, 1] = (self.bbxs[:, 1] + self.bbxs[:, 3]) // 2
+    @property
+    def centers(self):
+        return self._centers
 
-        return self.centers
+    @centers.setter
+    def centers(self, value):
+        if self._bbxs is None:
+            self._centers = value
+        else:
+            print('Data has bbxs. Over-writting centers...')
+            self._centers = value
+
+    @property
+    def bbxs(self):
+        return self._bbxs
+
+    @bbxs.setter
+    def bbxs(self, value):
+        self._bbxs = value
+
+        # set centers when bbxs are provided
+        centers = np.empty((self._bbxs.shape[0], 2), dtype=int)
+        centers[:, 0] = (self._bbxs[:, 0] + self._bbxs[:, 2]) // 2
+        centers[:, 1] = (self._bbxs[:, 1] + self._bbxs[:, 3]) // 2
+        self._centers = centers
+
+    @property
+    def scores(self):
+        return self._scores
+
+    @scores.setter
+    def scores(self, value):
+        self._scores = value
+
 
 
     def non_max_suppression_fast(self, overlapThresh):
         # Malisiewicz et al.
         # if there are no boxes, return an empty list
-        boxes = self.bbxs
+        boxes = self._bbxs
         if len(boxes) == 0:
             return []
 
