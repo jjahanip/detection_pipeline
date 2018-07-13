@@ -66,12 +66,14 @@ def read_image_from_filenames(image_filenames, to_ubyte=True, adjust_hist=False)
     return image
 
 
-def visualize_bbxs(image, centers=None, bbxs=None, save=False, adjust_hist=False):
+def visualize_bbxs(image, centers=None, bbxs=None, save=False, adjust_hist=False, dpi=80):
     # adjust the histogram of the image
     if adjust_hist:
         image = imadjust(image)
 
-    fig = plt.figure()
+    fig_height, fig_width = image.shape[:2]
+    figsize = fig_width / float(dpi), fig_height / float(dpi)
+    fig = plt.figure(figsize=figsize)
     ax = fig.add_subplot(111)
     ax.imshow(image)
     if centers is not None:
