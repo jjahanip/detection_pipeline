@@ -116,6 +116,8 @@ class JNet(object):
             bar = progressbar.ProgressBar(max_value=max_bar)
             crop_gen = data.next_crop()
             iterate = True
+            bbxs = []
+            scores = []
             while iterate:
                 bar.update(bar.value + 1)
 
@@ -156,20 +158,20 @@ class JNet(object):
                     box[:, [0, 2]] += corner[i][0]
                     box[:, [1, 3]] += corner[i][1]
 
-                    data.bbxs.append(box.astype(int))
+                    bbxs.append(box.astype(int))
 
                     # score
                     score = out_dict["detection_scores"][i, :][keep_boxes]
-                    data.scores.append(score)
+                    scores.append(score)
 
         bar.finish()
-        # to be added: non-max suppression
-        # to be added: rotate crop
-        data.bbxs = np.concatenate(data.bbxs)
-        data.scores = np.concatenate(data.scores)
 
-        data.bbxs = non_max_suppression_fast(data.bbxs, self.conf.nms_iou)
-        data.centers = data.get_centers()
+        # to be added: rotate crop
+        data.bbxs = np.concatenate(bbxs)
+        data.scores = np.concatenate(scores)
+
+        data.nms(overlapThresh=self.conf.nms_iou)
+        data.remove_close_centers(radius=3)
 
         # bbxs_image('data/test/hpc_crop/bbxs_nms_tf.tif', data.bbxs, (6000, 4000), color='red')
         bbxs_image('data/test/hpc_crop/bbxs.tif', data.bbxs, (6000, 4000))

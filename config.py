@@ -19,11 +19,12 @@ flags.DEFINE_integer('channel', 3, 'Network input channel size')
 flags.DEFINE_string('img_1', 'data/test/hpc_crop/R2C0_crop_crop.tif', 'image 1 path')
 flags.DEFINE_string('img_2', 'data/test/hpc_crop/R2C1_crop_crop.tif', 'image 2 path')
 flags.DEFINE_string('img_3', 'data/test/hpc_crop/R2C3_crop_crop.tif', 'image 3 path')
-flags.DEFINE_integer('crop_overlap', 25, 'Network input channel size')
+flags.DEFINE_integer('crop_overlap', 100, 'Network input channel size')
+flags.DEFINE_float('nms_iou', .6, 'intersection over union of bbxs for non max suppression')
 
 # Network paramteres
 flags.DEFINE_integer('batch_size', 5, 'training batch size')
-flags.DEFINE_float('score_threshold', .4, 'Threshold of score of detection box')
+flags.DEFINE_float('score_threshold', .7, 'Threshold of score of detection box')
 flags.DEFINE_integer('max_proposal', 400, 'maximum proposal per image')
 
 

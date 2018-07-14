@@ -95,9 +95,10 @@ class DataLoader(object):
 
         # update bbxs, centers and scores
         self.bbxs = np.delete(self._bbxs, to_be_removed, axis=0)
-        self._scores = np.delete(self._scores, to_be_removed, axis=0)
+        self.scores = np.delete(self._scores, to_be_removed, axis=0)
 
-    def non_max_suppression_fast(self, overlapThresh):
+    def nms(self, overlapThresh):
+        # non_max_suppression_fast
         # Malisiewicz et al.
         # if there are no boxes, return an empty list
         boxes = self._bbxs
@@ -153,8 +154,8 @@ class DataLoader(object):
 
         # return only the bounding boxes that were picked using the
         # integer data type
-        return boxes[pick].astype("int")
-
+        self.bbxs = boxes[pick].astype("int")
+        self.scores = self._scores[pick]
 
     def randomize(self):
         """ Randomizes the order of data samples and their corresponding labels"""
@@ -164,21 +165,21 @@ class DataLoader(object):
         return shuffled_x, shuffled_y
 
 
-def random_rotation_2d(batch, max_angle):
-    """ Randomly rotate an image by a random angle (-max_angle, max_angle).
-    Arguments:
-    max_angle: `float`. The maximum rotation angle.
-    Returns:
-    batch of rotated 2D images
-    """
-    size = batch.shape
-    batch = np.squeeze(batch)
-    batch_rot = np.zeros(batch.shape)
-    for i in range(batch.shape[0]):
-        if bool(random.getrandbits(1)):
-            image = np.squeeze(batch[i])
-            angle = random.uniform(-max_angle, max_angle)
-            batch_rot[i] = scipy.ndimage.interpolation.rotate(image, angle, mode='nearest', reshape=False)
-        else:
-            batch_rot[i] = batch[i]
-    return batch_rot.reshape(size)
+    def random_rotation_2d(batch, max_angle):
+        """ Randomly rotate an image by a random angle (-max_angle, max_angle).
+        Arguments:
+        max_angle: `float`. The maximum rotation angle.
+        Returns:
+        batch of rotated 2D images
+        """
+        size = batch.shape
+        batch = np.squeeze(batch)
+        batch_rot = np.zeros(batch.shape)
+        for i in range(batch.shape[0]):
+            if bool(random.getrandbits(1)):
+                image = np.squeeze(batch[i])
+                angle = random.uniform(-max_angle, max_angle)
+                batch_rot[i] = scipy.ndimage.interpolation.rotate(image, angle, mode='nearest', reshape=False)
+            else:
+                batch_rot[i] = batch[i]
+        return batch_rot.reshape(size)
