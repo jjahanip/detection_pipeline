@@ -66,12 +66,14 @@ def read_image_from_filenames(image_filenames, to_ubyte=True, adjust_hist=False)
     return image
 
 
-def visualize_bbxs(image, centers=None, bbxs=None, save=False, adjust_hist=False):
+def visualize_bbxs(image, centers=None, bbxs=None, save=False, adjust_hist=False, dpi=80):
     # adjust the histogram of the image
     if adjust_hist:
-        image = imadjust(image, cmap='gray')
+        image = imadjust(image)
 
-    fig = plt.figure()
+    fig_height, fig_width = image.shape[:2]
+    figsize = fig_width / float(dpi), fig_height / float(dpi)
+    fig = plt.figure(figsize=figsize)
     ax = fig.add_subplot(111)
     ax.imshow(image)
     if centers is not None:
@@ -150,7 +152,7 @@ def bbxs_image(file_name, bbxs, image_size, color='red'):
     :param color: bounding box color
     :return:
     '''
-    # create image for bounding boxes (works fine)
+
     box_pil = Image.new('RGB', image_size)
     box_draw = ImageDraw.Draw(box_pil)
     for xmin, ymin, xmax, ymax in bbxs:
@@ -158,3 +160,21 @@ def bbxs_image(file_name, bbxs, image_size, color='red'):
         box_draw.line([(left, top), (left, bottom), (right, bottom),
                        (right, top), (left, top)], width=2, fill=color)
     box_pil.save(file_name)
+
+
+def center_image(file_name, centers, image_size, color='red'):
+    '''
+    :param file_name: tifffile to be saved
+    :param bbxs: np.array [centroid_x centroid_y]
+    :param image_size: [width height]
+    :param color: center color
+    :return:
+    '''
+
+    image = Image.new('RGB', image_size)
+    center_draw = ImageDraw.Draw(image)
+
+    for center in centers:
+        center_draw.point((center[0], center[1]), fill=color)
+
+    image.save(file_name)
