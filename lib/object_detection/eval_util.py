@@ -556,8 +556,16 @@ def result_dict_for_single_example(image,
 
   if groundtruth:
     if input_data_fields.groundtruth_instance_masks in groundtruth:
+      masks = groundtruth[input_data_fields.groundtruth_instance_masks]
+      masks = tf.expand_dims(masks, 3)
+      masks = tf.image.resize_images(
+          masks,
+          image_shape[1:3],
+          method=tf.image.ResizeMethod.NEAREST_NEIGHBOR,
+          align_corners=True)
+      masks = tf.squeeze(masks, 3)
       groundtruth[input_data_fields.groundtruth_instance_masks] = tf.cast(
-          groundtruth[input_data_fields.groundtruth_instance_masks], tf.uint8)
+          masks, tf.uint8)
     output_dict.update(groundtruth)
     if scale_to_absolute:
       groundtruth_boxes = groundtruth[input_data_fields.groundtruth_boxes]
@@ -588,7 +596,8 @@ def get_eval_metric_ops_for_evaluators(evaluation_metrics,
         'name': (required) string representing category name e.g., 'cat', 'dog'.
     eval_dict: An evaluation dictionary, returned from
       result_dict_for_single_example().
-    include_metrics_per_category: If True, include metrics for each category.
+    include_metrics_per_category: If True, additionally include per-category
+      metrics.
 
   Returns:
     A dictionary of metric names to tuple of value_op and update_op that can be
@@ -615,7 +624,9 @@ def get_eval_metric_ops_for_evaluators(evaluation_metrics,
                   input_data_fields.groundtruth_classes],
               detection_boxes=eval_dict[detection_fields.detection_boxes],
               detection_scores=eval_dict[detection_fields.detection_scores],
-              detection_classes=eval_dict[detection_fields.detection_classes]))
+              detection_classes=eval_dict[detection_fields.detection_classes],
+              groundtruth_is_crowd=eval_dict.get(
+                  input_data_fields.groundtruth_is_crowd)))
     elif metric == 'coco_mask_metrics':
       coco_mask_evaluator = coco_evaluation.CocoMaskEvaluator(
           categories, include_metrics_per_category=include_metrics_per_category)
@@ -629,12 +640,12 @@ def get_eval_metric_ops_for_evaluators(evaluation_metrics,
                   input_data_fields.groundtruth_instance_masks],
               detection_scores=eval_dict[detection_fields.detection_scores],
               detection_classes=eval_dict[detection_fields.detection_classes],
-              detection_masks=eval_dict[detection_fields.detection_masks]))
+              detection_masks=eval_dict[detection_fields.detection_masks],
+              groundtruth_is_crowd=eval_dict.get(
+                  input_data_fields.groundtruth_is_crowd),))
     else:
       raise ValueError('The only evaluation metrics supported are '
                        '"coco_detection_metrics" and "coco_mask_metrics". '
                        'Found {} in the evaluation metrics'.format(metric))
 
   return eval_metric_ops
-
-

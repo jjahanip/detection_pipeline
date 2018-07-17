@@ -79,10 +79,12 @@ class BoxPredictor(object):
 
     Returns:
       A dictionary containing at least the following tensors.
-        box_encodings: A list of float tensors of shape
-          [batch_size, num_anchors_i, q, code_size] representing the location of
-          the objects, where q is 1 or the number of classes. Each entry in the
-          list corresponds to a feature map in the input `image_features` list.
+        box_encodings: A list of float tensors. Each entry in the list
+          corresponds to a feature map in the input `image_features` list. All
+          tensors in the list have one of the two following shapes:
+          a. [batch_size, num_anchors_i, q, code_size] representing the location
+            of the objects, where q is 1 or the number of classes.
+          b. [batch_size, num_anchors_i, code_size].
         class_predictions_with_background: A list of float tensors of shape
           [batch_size, num_anchors_i, num_classes + 1] representing the class
           predictions for the proposals. Each entry in the list corresponds to a
@@ -120,10 +122,12 @@ class BoxPredictor(object):
 
     Returns:
       A dictionary containing at least the following tensors.
-        box_encodings: A list of float tensors of shape
-          [batch_size, num_anchors_i, q, code_size] representing the location of
-          the objects, where q is 1 or the number of classes. Each entry in the
-          list corresponds to a feature map in the input `image_features` list.
+        box_encodings: A list of float tensors. Each entry in the list
+          corresponds to a feature map in the input `image_features` list. All
+          tensors in the list have one of the two following shapes:
+          a. [batch_size, num_anchors_i, q, code_size] representing the location
+            of the objects, where q is 1 or the number of classes.
+          b. [batch_size, num_anchors_i, code_size].
         class_predictions_with_background: A list of float tensors of shape
           [batch_size, num_anchors_i, num_classes + 1] representing the class
           predictions for the proposals. Each entry in the list corresponds to a
@@ -147,7 +151,7 @@ class RfcnBoxPredictor(BoxPredictor):
   def __init__(self,
                is_training,
                num_classes,
-               conv_hyperparams,
+               conv_hyperparams_fn,
                num_spatial_bins,
                depth,
                crop_size,
@@ -160,8 +164,8 @@ class RfcnBoxPredictor(BoxPredictor):
         include the background category, so if groundtruth labels take values
         in {0, 1, .., K-1}, num_classes=K (and not K+1, even though the
         assigned classification targets can range from {0,... K}).
-      conv_hyperparams: Slim arg_scope with hyperparameters for conolutional
-        layers.
+      conv_hyperparams_fn: A function to construct tf-slim arg_scope with
+        hyperparameters for convolutional layers.
       num_spatial_bins: A list of two integers `[spatial_bins_y,
         spatial_bins_x]`.
       depth: Target depth to reduce the input feature maps to.
@@ -169,7 +173,7 @@ class RfcnBoxPredictor(BoxPredictor):
       box_code_size: Size of encoding for each box.
     """
     super(RfcnBoxPredictor, self).__init__(is_training, num_classes)
-    self._conv_hyperparams = conv_hyperparams
+    self._conv_hyperparams_fn = conv_hyperparams_fn
     self._num_spatial_bins = num_spatial_bins
     self._depth = depth
     self._crop_size = crop_size
@@ -227,7 +231,7 @@ class RfcnBoxPredictor(BoxPredictor):
       return tf.reshape(ones_mat * multiplier, [-1])
 
     net = image_feature
-    with slim.arg_scope(self._conv_hyperparams):
+    with slim.arg_scope(self._conv_hyperparams_fn()):
       net = slim.conv2d(net, self._depth, [1, 1], scope='reduce_depth')
       # Location predictions.
       location_feature_map_depth = (self._num_spatial_bins[0] *
@@ -297,17 +301,19 @@ class MaskRCNNBoxPredictor(BoxPredictor):
   def __init__(self,
                is_training,
                num_classes,
-               fc_hyperparams,
+               fc_hyperparams_fn,
                use_dropout,
                dropout_keep_prob,
                box_code_size,
-               conv_hyperparams=None,
+               conv_hyperparams_fn=None,
                predict_instance_masks=False,
                mask_height=14,
                mask_width=14,
                mask_prediction_num_conv_layers=2,
                mask_prediction_conv_depth=256,
-               predict_keypoints=False):
+               masks_are_class_agnostic=False,
+               predict_keypoints=False,
+               share_box_across_classes=False):
     """Constructor.
 
     Args:
@@ -316,16 +322,16 @@ class MaskRCNNBoxPredictor(BoxPredictor):
         include the background category, so if groundtruth labels take values
         in {0, 1, .., K-1}, num_classes=K (and not K+1, even though the
         assigned classification targets can range from {0,... K}).
-      fc_hyperparams: Slim arg_scope with hyperparameters for fully
-        connected ops.
+      fc_hyperparams_fn: A function to generate tf-slim arg_scope with
+        hyperparameters for fully connected ops.
       use_dropout: Option to use dropout or not.  Note that a single dropout
         op is applied here prior to both box and class predictions, which stands
         in contrast to the ConvolutionalBoxPredictor below.
       dropout_keep_prob: Keep probability for dropout.
         This is only used if use_dropout is True.
       box_code_size: Size of encoding for each box.
-      conv_hyperparams: Slim arg_scope with hyperparameters for convolution
-        ops.
+      conv_hyperparams_fn: A function to generate tf-slim arg_scope with
+        hyperparameters for convolution ops.
       predict_instance_masks: Whether to predict object masks inside detection
         boxes.
       mask_height: Desired output mask height. The default value is 14.
@@ -337,8 +343,11 @@ class MaskRCNNBoxPredictor(BoxPredictor):
         to 0, the depth of the convolution layers will be automatically chosen
         based on the number of object classes and the number of channels in the
         image features.
+      masks_are_class_agnostic: Boolean determining if the mask-head is
+        class-agnostic or not.
       predict_keypoints: Whether to predict keypoints insde detection boxes.
-
+      share_box_across_classes: Whether to share boxes across classes rather
+        than use a different box for each class.
 
     Raises:
       ValueError: If predict_instance_masks is true but conv_hyperparams is not
@@ -347,21 +356,23 @@ class MaskRCNNBoxPredictor(BoxPredictor):
       ValueError: If mask_prediction_num_conv_layers is smaller than two.
     """
     super(MaskRCNNBoxPredictor, self).__init__(is_training, num_classes)
-    self._fc_hyperparams = fc_hyperparams
+    self._fc_hyperparams_fn = fc_hyperparams_fn
     self._use_dropout = use_dropout
     self._box_code_size = box_code_size
     self._dropout_keep_prob = dropout_keep_prob
-    self._conv_hyperparams = conv_hyperparams
+    self._conv_hyperparams_fn = conv_hyperparams_fn
     self._predict_instance_masks = predict_instance_masks
     self._mask_height = mask_height
     self._mask_width = mask_width
     self._mask_prediction_num_conv_layers = mask_prediction_num_conv_layers
     self._mask_prediction_conv_depth = mask_prediction_conv_depth
+    self._masks_are_class_agnostic = masks_are_class_agnostic
     self._predict_keypoints = predict_keypoints
+    self._share_box_across_classes = share_box_across_classes
     if self._predict_keypoints:
       raise ValueError('Keypoint prediction is unimplemented.')
     if ((self._predict_instance_masks or self._predict_keypoints) and
-        self._conv_hyperparams is None):
+        self._conv_hyperparams_fn is None):
       raise ValueError('`conv_hyperparams` must be provided when predicting '
                        'masks.')
     if self._mask_prediction_num_conv_layers < 2:
@@ -399,10 +410,14 @@ class MaskRCNNBoxPredictor(BoxPredictor):
       flattened_image_features = slim.dropout(flattened_image_features,
                                               keep_prob=self._dropout_keep_prob,
                                               is_training=self._is_training)
-    with slim.arg_scope(self._fc_hyperparams):
+    number_of_boxes = 1
+    if not self._share_box_across_classes:
+      number_of_boxes = self._num_classes
+
+    with slim.arg_scope(self._fc_hyperparams_fn()):
       box_encodings = slim.fully_connected(
           flattened_image_features,
-          self._num_classes * self._box_code_size,
+          number_of_boxes * self._box_code_size,
           activation_fn=None,
           scope='BoxEncodingPredictor')
       class_predictions_with_background = slim.fully_connected(
@@ -411,7 +426,7 @@ class MaskRCNNBoxPredictor(BoxPredictor):
           activation_fn=None,
           scope='ClassPredictor')
     box_encodings = tf.reshape(
-        box_encodings, [-1, 1, self._num_classes, self._box_code_size])
+        box_encodings, [-1, 1, number_of_boxes, self._box_code_size])
     class_predictions_with_background = tf.reshape(
         class_predictions_with_background, [-1, 1, self._num_classes + 1])
     return box_encodings, class_predictions_with_background
@@ -463,7 +478,7 @@ class MaskRCNNBoxPredictor(BoxPredictor):
       num_feature_channels = image_features.get_shape().as_list()[3]
       num_conv_channels = self._get_mask_predictor_conv_depth(
           num_feature_channels, self.num_classes)
-    with slim.arg_scope(self._conv_hyperparams):
+    with slim.arg_scope(self._conv_hyperparams_fn()):
       upsampled_features = tf.image.resize_bilinear(
           image_features,
           [self._mask_height, self._mask_width],
@@ -473,8 +488,9 @@ class MaskRCNNBoxPredictor(BoxPredictor):
             upsampled_features,
             num_outputs=num_conv_channels,
             kernel_size=[3, 3])
+      num_masks = 1 if self._masks_are_class_agnostic else self.num_classes
       mask_predictions = slim.conv2d(upsampled_features,
-                                     num_outputs=self.num_classes,
+                                     num_outputs=num_masks,
                                      activation_fn=None,
                                      kernel_size=[3, 3])
       return tf.expand_dims(
@@ -578,7 +594,7 @@ class ConvolutionalBoxPredictor(BoxPredictor):
   def __init__(self,
                is_training,
                num_classes,
-               conv_hyperparams,
+               conv_hyperparams_fn,
                min_depth,
                max_depth,
                num_layers_before_predictor,
@@ -597,8 +613,9 @@ class ConvolutionalBoxPredictor(BoxPredictor):
         include the background category, so if groundtruth labels take values
         in {0, 1, .., K-1}, num_classes=K (and not K+1, even though the
         assigned classification targets can range from {0,... K}).
-      conv_hyperparams: Slim arg_scope with hyperparameters for convolution ops.
-      min_depth: Minumum feature depth prior to predicting box encodings
+      conv_hyperparams_fn: A function to generate tf-slim arg_scope with
+        hyperparameters for convolution ops.
+      min_depth: Minimum feature depth prior to predicting box encodings
         and class predictions.
       max_depth: Maximum feature depth prior to predicting box encodings
         and class predictions. If max_depth is set to 0, no additional
@@ -626,7 +643,7 @@ class ConvolutionalBoxPredictor(BoxPredictor):
     super(ConvolutionalBoxPredictor, self).__init__(is_training, num_classes)
     if min_depth > max_depth:
       raise ValueError('min_depth should be less than or equal to max_depth')
-    self._conv_hyperparams = conv_hyperparams
+    self._conv_hyperparams_fn = conv_hyperparams_fn
     self._min_depth = min_depth
     self._max_depth = max_depth
     self._num_layers_before_predictor = num_layers_before_predictor
@@ -679,7 +696,7 @@ class ConvolutionalBoxPredictor(BoxPredictor):
         # Add a slot for the background class.
         num_class_slots = self.num_classes + 1
         net = image_feature
-        with slim.arg_scope(self._conv_hyperparams), \
+        with slim.arg_scope(self._conv_hyperparams_fn()), \
              slim.arg_scope([slim.dropout], is_training=self._is_training):
           # Add additional conv layers before the class predictor.
           features_depth = static_shape.get_depth(image_feature.get_shape())
@@ -752,6 +769,13 @@ class ConvolutionalBoxPredictor(BoxPredictor):
     }
 
 
+# TODO(rathodv): Replace with slim.arg_scope_func_key once its available
+# externally.
+def _arg_scope_func_key(op):
+  """Returns a key that can be used to index arg_scope dictionary."""
+  return getattr(op, '_key_op', str(op))
+
+
 # TODO(rathodv): Merge the implementation with ConvolutionalBoxPredictor above
 # since they are very similar.
 class WeightSharedConvolutionalBoxPredictor(BoxPredictor):
@@ -760,19 +784,26 @@ class WeightSharedConvolutionalBoxPredictor(BoxPredictor):
   Defines the box predictor as defined in
   https://arxiv.org/abs/1708.02002. This class differs from
   ConvolutionalBoxPredictor in that it shares weights and biases while
-  predicting from different feature maps.  Separate multi-layer towers are
-  constructed for the box encoding and class predictors respectively.
+  predicting from different feature maps. However, batch_norm parameters are not
+  shared because the statistics of the activations vary among the different
+  feature maps.
+
+  Also note that separate multi-layer towers are constructed for the box
+  encoding and class predictors respectively.
   """
 
   def __init__(self,
                is_training,
                num_classes,
-               conv_hyperparams,
+               conv_hyperparams_fn,
                depth,
                num_layers_before_predictor,
                box_code_size,
                kernel_size=3,
-               class_prediction_bias_init=0.0):
+               class_prediction_bias_init=0.0,
+               use_dropout=False,
+               dropout_keep_prob=0.8,
+               share_prediction_tower=False):
     """Constructor.
 
     Args:
@@ -781,7 +812,8 @@ class WeightSharedConvolutionalBoxPredictor(BoxPredictor):
         include the background category, so if groundtruth labels take values
         in {0, 1, .., K-1}, num_classes=K (and not K+1, even though the
         assigned classification targets can range from {0,... K}).
-      conv_hyperparams: Slim arg_scope with hyperparameters for convolution ops.
+      conv_hyperparams_fn: A function to generate tf-slim arg_scope with
+        hyperparameters for convolution ops.
       depth: depth of conv layers.
       num_layers_before_predictor: Number of the additional conv layers before
         the predictor.
@@ -789,15 +821,22 @@ class WeightSharedConvolutionalBoxPredictor(BoxPredictor):
       kernel_size: Size of final convolution kernel.
       class_prediction_bias_init: constant value to initialize bias of the last
         conv2d layer before class prediction.
+      use_dropout: Whether to apply dropout to class prediction head.
+      dropout_keep_prob: Probability of keeping activiations.
+      share_prediction_tower: Whether to share the multi-layer tower between box
+        prediction and class prediction heads.
     """
     super(WeightSharedConvolutionalBoxPredictor, self).__init__(is_training,
                                                                 num_classes)
-    self._conv_hyperparams = conv_hyperparams
+    self._conv_hyperparams_fn = conv_hyperparams_fn
     self._depth = depth
     self._num_layers_before_predictor = num_layers_before_predictor
     self._box_code_size = box_code_size
     self._kernel_size = kernel_size
     self._class_prediction_bias_init = class_prediction_bias_init
+    self._use_dropout = use_dropout
+    self._dropout_keep_prob = dropout_keep_prob
+    self._share_prediction_tower = share_prediction_tower
 
   def _predict(self, image_features, num_predictions_per_location_list):
     """Computes encoded object locations and corresponding confidences.
@@ -805,7 +844,9 @@ class WeightSharedConvolutionalBoxPredictor(BoxPredictor):
     Args:
       image_features: A list of float tensors of shape [batch_size, height_i,
         width_i, channels] containing features for a batch of images. Note that
-        all tensors in the list must have the same number of channels.
+        when not all tensors in the list have the same number of channels, an
+        additional projection layer will be added on top the tensor to generate
+        feature map with number of channels consitent with the majority.
       num_predictions_per_location_list: A list of integers representing the
         number of box predictions to be made per spatial location for each
         feature map. Note that all values must be the same since the weights are
@@ -813,13 +854,14 @@ class WeightSharedConvolutionalBoxPredictor(BoxPredictor):
 
     Returns:
       box_encodings: A list of float tensors of shape
-        [batch_size, num_anchors_i, q, code_size] representing the location of
-        the objects, where q is 1 or the number of classes. Each entry in the
-        list corresponds to a feature map in the input `image_features` list.
+        [batch_size, num_anchors_i, code_size] representing the location of
+        the objects. Each entry in the list corresponds to a feature map in the
+        input `image_features` list.
       class_predictions_with_background: A list of float tensors of shape
         [batch_size, num_anchors_i, num_classes + 1] representing the class
         predictions for the proposals. Each entry in the list corresponds to a
         feature map in the input `image_features` list.
+
 
     Raises:
       ValueError: If the image feature maps do not have the same number of
@@ -833,48 +875,101 @@ class WeightSharedConvolutionalBoxPredictor(BoxPredictor):
     feature_channels = [
         image_feature.shape[3].value for image_feature in image_features
     ]
-    if len(set(feature_channels)) > 1:
-      raise ValueError('all feature maps must have the same number of '
-                       'channels, found: {}'.format(feature_channels))
+    has_different_feature_channels = len(set(feature_channels)) > 1
+    if has_different_feature_channels:
+      inserted_layer_counter = 0
+      target_channel = max(set(feature_channels), key=feature_channels.count)
+      tf.logging.info('Not all feature maps have the same number of '
+                      'channels, found: {}, addition project layers '
+                      'to bring all feature maps to uniform channels '
+                      'of {}'.format(feature_channels, target_channel))
     box_encodings_list = []
     class_predictions_list = []
-    for (image_feature, num_predictions_per_location) in zip(
-        image_features, num_predictions_per_location_list):
+    num_class_slots = self.num_classes + 1
+    for feature_index, (image_feature,
+                        num_predictions_per_location) in enumerate(
+                            zip(image_features,
+                                num_predictions_per_location_list)):
       # Add a slot for the background class.
       with tf.variable_scope('WeightSharedConvolutionalBoxPredictor',
                              reuse=tf.AUTO_REUSE):
-        num_class_slots = self.num_classes + 1
-        box_encodings_net = image_feature
-        class_predictions_net = image_feature
-        with slim.arg_scope(self._conv_hyperparams):
+        with slim.arg_scope(self._conv_hyperparams_fn()) as sc:
+          apply_batch_norm = _arg_scope_func_key(slim.batch_norm) in sc
+          # Insert an additional projection layer if necessary.
+          if (has_different_feature_channels and
+              image_feature.shape[3].value != target_channel):
+            image_feature = slim.conv2d(
+                image_feature,
+                target_channel, [1, 1],
+                stride=1,
+                padding='SAME',
+                activation_fn=None,
+                normalizer_fn=(tf.identity if apply_batch_norm else None),
+                scope='ProjectionLayer/conv2d_{}'.format(
+                    inserted_layer_counter))
+            if apply_batch_norm:
+              image_feature = slim.batch_norm(
+                  image_feature,
+                  scope='ProjectionLayer/conv2d_{}/BatchNorm'.format(
+                      inserted_layer_counter))
+            inserted_layer_counter += 1
+          box_encodings_net = image_feature
+          class_predictions_net = image_feature
           for i in range(self._num_layers_before_predictor):
+            box_prediction_tower_prefix = (
+                'PredictionTower' if self._share_prediction_tower
+                else 'BoxPredictionTower')
             box_encodings_net = slim.conv2d(
                 box_encodings_net,
                 self._depth,
                 [self._kernel_size, self._kernel_size],
                 stride=1,
                 padding='SAME',
-                scope='BoxEncodingPredictionTower/conv2d_{}'.format(i))
+                activation_fn=None,
+                normalizer_fn=(tf.identity if apply_batch_norm else None),
+                scope='{}/conv2d_{}'.format(box_prediction_tower_prefix, i))
+            if apply_batch_norm:
+              box_encodings_net = slim.batch_norm(
+                  box_encodings_net,
+                  scope='{}/conv2d_{}/BatchNorm/feature_{}'.
+                  format(box_prediction_tower_prefix, i, feature_index))
+            box_encodings_net = tf.nn.relu6(box_encodings_net)
           box_encodings = slim.conv2d(
               box_encodings_net,
               num_predictions_per_location * self._box_code_size,
               [self._kernel_size, self._kernel_size],
               activation_fn=None, stride=1, padding='SAME',
-              scope='BoxEncodingPredictor')
+              normalizer_fn=None,
+              scope='BoxPredictor')
 
-          for i in range(self._num_layers_before_predictor):
-            class_predictions_net = slim.conv2d(
-                class_predictions_net,
-                self._depth,
-                [self._kernel_size, self._kernel_size],
-                stride=1,
-                padding='SAME',
-                scope='ClassPredictionTower/conv2d_{}'.format(i))
+          if self._share_prediction_tower:
+            class_predictions_net = box_encodings_net
+          else:
+            for i in range(self._num_layers_before_predictor):
+              class_predictions_net = slim.conv2d(
+                  class_predictions_net,
+                  self._depth,
+                  [self._kernel_size, self._kernel_size],
+                  stride=1,
+                  padding='SAME',
+                  activation_fn=None,
+                  normalizer_fn=(tf.identity if apply_batch_norm else None),
+                  scope='ClassPredictionTower/conv2d_{}'.format(i))
+              if apply_batch_norm:
+                class_predictions_net = slim.batch_norm(
+                    class_predictions_net,
+                    scope='ClassPredictionTower/conv2d_{}/BatchNorm/feature_{}'
+                    .format(i, feature_index))
+              class_predictions_net = tf.nn.relu6(class_predictions_net)
+          if self._use_dropout:
+            class_predictions_net = slim.dropout(
+                class_predictions_net, keep_prob=self._dropout_keep_prob)
           class_predictions_with_background = slim.conv2d(
               class_predictions_net,
               num_predictions_per_location * num_class_slots,
               [self._kernel_size, self._kernel_size],
               activation_fn=None, stride=1, padding='SAME',
+              normalizer_fn=None,
               biases_initializer=tf.constant_initializer(
                   self._class_prediction_bias_init),
               scope='ClassPredictor')
@@ -887,7 +982,7 @@ class WeightSharedConvolutionalBoxPredictor(BoxPredictor):
                                        combined_feature_map_shape[1] *
                                        combined_feature_map_shape[2] *
                                        num_predictions_per_location,
-                                       1, self._box_code_size]))
+                                       self._box_code_size]))
           box_encodings_list.append(box_encodings)
           class_predictions_with_background = tf.reshape(
               class_predictions_with_background,

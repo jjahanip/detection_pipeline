@@ -56,7 +56,7 @@ class RFCNMetaArch(faster_rcnn_meta_arch.FasterRCNNMetaArch):
                number_of_stages,
                first_stage_anchor_generator,
                first_stage_atrous_rate,
-               first_stage_box_predictor_arg_scope,
+               first_stage_box_predictor_arg_scope_fn,
                first_stage_box_predictor_kernel_size,
                first_stage_box_predictor_depth,
                first_stage_minibatch_size,
@@ -76,7 +76,8 @@ class RFCNMetaArch(faster_rcnn_meta_arch.FasterRCNNMetaArch):
                second_stage_classification_loss,
                hard_example_miner,
                parallel_iterations=16,
-               add_summaries=True):
+               add_summaries=True,
+               use_matmul_crop_and_resize=False):
     """RFCNMetaArch Constructor.
 
     Args:
@@ -103,8 +104,9 @@ class RFCNMetaArch(faster_rcnn_meta_arch.FasterRCNNMetaArch):
         denser resolutions.  The atrous rate is used to compensate for the
         denser feature maps by using an effectively larger receptive field.
         (This should typically be set to 1).
-      first_stage_box_predictor_arg_scope: Slim arg_scope for conv2d,
-        separable_conv2d and fully_connected ops for the RPN box predictor.
+      first_stage_box_predictor_arg_scope_fn: A function to generate tf-slim
+        arg_scope for conv2d, separable_conv2d and fully_connected ops for the
+        RPN box predictor.
       first_stage_box_predictor_kernel_size: Kernel size to use for the
         convolution op just prior to RPN box predictions.
       first_stage_box_predictor_depth: Output depth for the convolution op
@@ -158,14 +160,17 @@ class RFCNMetaArch(faster_rcnn_meta_arch.FasterRCNNMetaArch):
         in parallel for calls to tf.map_fn.
       add_summaries: boolean (default: True) controlling whether summary ops
         should be added to tensorflow graph.
+      use_matmul_crop_and_resize: Force the use of matrix multiplication based
+        crop and resize instead of standard tf.image.crop_and_resize while
+        computing second stage input feature maps.
 
     Raises:
       ValueError: If `second_stage_batch_size` > `first_stage_max_proposals`
       ValueError: If first_stage_anchor_generator is not of type
         grid_anchor_generator.GridAnchorGenerator.
     """
-    # TODO(rathodv): add_summaries is currently unused. Respect that directive
-    # in the future.
+    # TODO(rathodv): add_summaries and crop_and_resize_fn is currently
+    # unused. Respect that directive in the future.
     super(RFCNMetaArch, self).__init__(
         is_training,
         num_classes,
@@ -174,7 +179,7 @@ class RFCNMetaArch(faster_rcnn_meta_arch.FasterRCNNMetaArch):
         number_of_stages,
         first_stage_anchor_generator,
         first_stage_atrous_rate,
-        first_stage_box_predictor_arg_scope,
+        first_stage_box_predictor_arg_scope_fn,
         first_stage_box_predictor_kernel_size,
         first_stage_box_predictor_depth,
         first_stage_minibatch_size,
