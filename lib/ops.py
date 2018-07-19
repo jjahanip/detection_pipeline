@@ -16,7 +16,7 @@ def check_path(loc):
         return loc
 
 
-def write_object(f, xmin, ymin, xmax, ymax, name):
+def write_object(f, xmin, ymin, xmax, ymax, label, trunc):
     '''
     Write object information in xml file
     :param f: writer object
@@ -24,19 +24,20 @@ def write_object(f, xmin, ymin, xmax, ymax, name):
     :param ymin: top left corner y
     :param xmax: bottom right corner x
     :param ymax: bottom right corner y
-    :param name: string name of the ckass
+    :param label: string name of the class
+    :param trunc: status of truncated or not truncated object
     :return: None
     '''
     line = '\t<object>\n'
     f.writelines(line)
 
-    line = '\t\t<name>' + name +'</name>\n'
+    line = '\t\t<name>' + label +'</name>\n'
     f.writelines(line)
 
     line = '\t\t<pose>Unspecified</pose>\n'
     f.writelines(line)
 
-    line = '\t\t<truncated>0</truncated>\n'
+    line = '\t\t<truncated>' + trunc + '</truncated>\n'
     f.writelines(line)
 
     line = '\t\t<difficult>0</difficult>\n'
@@ -64,7 +65,7 @@ def write_object(f, xmin, ymin, xmax, ymax, name):
     f.writelines(line)
 
 
-def write_xml(xml_fname, bboxes, labels, image_size=(300, 300, 1)):
+def write_xml(xml_fname, corner, bboxes, labels, truncated, image_size=(300, 300, 1)):
     '''
     Write xml file for single image
     :param xml_fname: /path/to/xml_filename
@@ -97,7 +98,10 @@ def write_xml(xml_fname, bboxes, labels, image_size=(300, 300, 1)):
     line = '\t<source>\n'
     f.writelines(line)
 
-    line = '\t\t<database>Unknown</database>\n'
+    line = '\t\t<database>50_plex</database>\n'
+    f.writelines(line)
+
+    line = '\t\t<corner>' + ",".join(map(str, corner)) + '</corner>\n'
     f.writelines(line)
 
     line = '\t</source>\n'
@@ -106,10 +110,10 @@ def write_xml(xml_fname, bboxes, labels, image_size=(300, 300, 1)):
     line = '\t<size>\n'
     f.writelines(line)
 
-    line = '\t\t<width>' + str(height) +'</width>\n'
+    line = '\t\t<width>' + str(width) +'</width>\n'
     f.writelines(line)
 
-    line = '\t\t<height>' + str(width) +'</height>\n'
+    line = '\t\t<height>' + str(height) +'</height>\n'
     f.writelines(line)
 
     line = '\t\t<depth>3</depth>\n'
@@ -122,9 +126,9 @@ def write_xml(xml_fname, bboxes, labels, image_size=(300, 300, 1)):
     f.writelines(line)
 
     # write the object information
-    for bbox, label in zip(bboxes, labels):
+    for bbox, label, trunc in zip(bboxes, labels, truncated):
         [xmin, ymin, xmax, ymax] = bbox
-        write_object(f, str(xmin), str(ymin), str(xmax), str(ymax), str(label))
+        write_object(f, str(xmin), str(ymin), str(xmax), str(ymax), str(label), str(trunc))
 
     line = '</annotation>\n'
     f.writelines(line)
