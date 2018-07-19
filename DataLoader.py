@@ -1,45 +1,50 @@
+import os
+import pandas as pd
 import random
 import scipy
 import numpy as np
 import scipy.spatial as spatial
+import warnings
+import skimage
+from skimage import exposure
 
-from lib.image_uitls import read_image_from_filenames
+from lib.image_uitls import read_image_from_filenames, imadjust, visualize_bbxs
+from lib.segmentation import GenerateBBoxfromSeeds
+from lib.ops import write_xml
+
 
 class DataLoader(object):
 
-    def __init__(self, cfg):
-        self.cfg = cfg
-        self.augment = cfg.data_augment
-        self.max_angle = cfg.max_angle
-        self.batch_size = cfg.batch_size
-        self.height = cfg.height
-        self.width = cfg.width
-        self.channel = cfg.channel
-        self.ovrlp = cfg.crop_overlap
-        self.image = read_image_from_filenames([cfg.img_1, cfg.img_2, cfg.img_3], to_ubyte=False)
+    def __init__(self, config):
 
-        self._centers = None
-        self._bbxs = None
+        # read all images
+        image_filenames = []
+        for i in range(config.channel):
+            filename = getattr(config, 'c{}'.format(i+1))
+            image_filenames.append(os.path.join(config.data_dir, filename))
+        self.image = read_image_from_filenames(image_filenames, to_ubyte=False)
+
+        self.height = config.height
+        self.width = config.width
+        self.channel = config.channel
+        self.ovrlp = config.crop_overlap
+
+        # read centers if exist
+        if os.path.isfile(os.path.join(config.data_dir, 'centers.txt')):
+            centers_table = pd.read_csv(os.path.join(config.data_dir, 'centers.txt'), sep='\t')
+            self.centers = centers_table[['centriod_x', 'centriod_y']].values
+        else:
+            self._centers = None
+
+        # read bbxs if exist
+        if os.path.isfile(os.path.join(config.data_dir, 'bbxs.txt')):
+            bbxs_table = pd.read_csv(os.path.join(config.data_dir, 'bbxs.txt'), sep='\t')
+            self.bbxs = bbxs_table[['xmin', 'ymin', 'xmax', 'ymax']].values
+        else:
+            self._bbxs = None
+
         self._scores = None
 
-    def next_crop(self):
-
-        # get image information
-        img_rows, img_cols, img_ch = self.image.shape  # img_rows = height , img_cols = width
-        crop_size = (self.width, self.height)
-
-        # get each crop
-        for i in range(0, img_rows, self.height - self.ovrlp):
-            for j in range(0, img_cols, self.width - self.ovrlp):
-                # crop the image
-                crop_img = self.image[i:i + self.height, j:j + self.width, :]  # create crop image
-                # if we were at the edges of the image, zero pad the crop
-                if crop_img.shape[:2][::-1] != crop_size:
-                    temp = np.copy(crop_img)
-                    crop_img = np.zeros((self.height, self.width, 3))
-                    crop_img[:temp.shape[0], :temp.shape[1], :] = temp
-
-                yield [j, i], crop_img
 
     @property
     def centers(self):
@@ -75,6 +80,26 @@ class DataLoader(object):
     def scores(self, value):
         self._scores = value
 
+    def next_crop(self):
+
+        # get image information
+        img_rows, img_cols, img_ch = self.image.shape  # img_rows = height , img_cols = width
+        crop_size = (self.width, self.height)
+
+        # get each crop
+        for i in range(0, img_rows, self.height - self.ovrlp):
+            for j in range(0, img_cols, self.width - self.ovrlp):
+
+                # temporary store the values of crop
+                temp = self.image[i:i + self.height, j:j + self.width, :]
+
+                # create new array to copy temporary stored values
+                crop_img = np.zeros((self.height, self.width, self.image.shape[-1]), dtype=self.image.dtype)
+                crop_img[:temp.shape[0], :temp.shape[1], :] = temp
+
+                yield [j, i], crop_img
+
+
     def remove_close_centers(self, radius=3):
         # get groups of centers
         tree = spatial.cKDTree(self._centers)
@@ -96,6 +121,94 @@ class DataLoader(object):
         # update bbxs, centers and scores
         self.bbxs = np.delete(self._bbxs, to_be_removed, axis=0)
         self.scores = np.delete(self._scores, to_be_removed, axis=0)
+
+    def write_crops(self, save_folder, adjust_hist=False):
+
+        if not os.path.isdir(save_folder):
+            os.mkdir(save_folder)
+
+        # check for subdirectories
+        dir_list = os.listdir(save_folder)
+        if 'imgs' not in dir_list:
+            os.mkdir(os.path.join(save_folder, 'imgs'))
+        if 'xmls' not in dir_list:
+            os.mkdir(os.path.join(save_folder, 'xmls'))
+
+        crop_gen = self.next_crop()
+        idx = 1
+        while True:
+            try:
+                [j, i], crop_image = next(crop_gen)
+            except StopIteration:
+                break
+
+            if self._bbxs is not None:
+                # find cells that center is in the crop
+                crop_idx = np.where(((self.centers[:, 0] > j) &
+                                     (self.centers[:, 0] < j + self.width) &
+                                     (self.centers[:, 1] > i) &
+                                     (self.centers[:, 1] < i + self.height)),
+                                    True, False)
+
+                if not np.any(crop_idx):  # if no cell in the crop, SKIP
+                    continue
+
+            crop_centers = self.centers[crop_idx, :]
+
+            # shift the x & y values based on crop size
+            crop_centers[:, 0] = crop_centers[:, 0] - j
+            crop_centers[:, 1] = crop_centers[:, 1] - i
+
+            # if user provides the bounding boxes
+            if self._bbxs is not None:
+                # extract bbxs in the crop
+                crop_bbxs = self.bbxs[crop_idx, :]
+                # shift the x & y values based on crop size
+                crop_bbxs[:, [0, 2]] = crop_bbxs[:, [0, 2]] - j
+                crop_bbxs[:, [1, 3]] = crop_bbxs[:, [1, 3]] - i
+            else:
+                # generate bounding boxes using segmentation
+                dapi = np.copy(crop_image[:, :, 0])
+                # for 16bit images only.
+                # TODO: general form for all types
+                dapi = exposure.rescale_intensity((dapi // 256).astype('uint8'),
+                                                  in_range='image', out_range='dtype')
+                crop_bbxs = GenerateBBoxfromSeeds(dapi, crop_centers)
+
+            # find truncated objects in crop
+            crop_truncated = np.where(((crop_bbxs[:, 0] < 0) |
+                                       (crop_bbxs[:, 1] < 0) |
+                                       (crop_bbxs[:, 2] > self.width) |
+                                       (crop_bbxs[:, 3] > self.height)), True, False)
+            # clip truncated objects
+            if np.any(crop_truncated):
+                crop_bbxs[:, [0, 2]] = np.clip(crop_bbxs[:, [0, 2]], 1, self.width - 1)
+                crop_bbxs[:, [1, 3]] = np.clip(crop_bbxs[:, [1, 3]], 1, self.height - 1)
+
+            # save image and xml:
+            filename = '{:05}'.format(idx)
+            if adjust_hist:
+                # for 16bit images only.
+                # TODO: general form for all types
+                crop_image = exposure.rescale_intensity((crop_image // 256).astype('uint8'),
+                                                        in_range='image', out_range='dtype')
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                skimage.io.imsave(os.path.join(save_folder, 'imgs', filename + '.jpeg'),
+                                  np.squeeze(crop_image))  # save the image
+
+            # write bounding boxes in xml file
+            labels = ['Nucleus'] * crop_bbxs.shape[0]
+            truncated = crop_truncated * 1
+            write_xml(os.path.join(save_folder, 'xmls', filename + '.xml'), corner=[j, i],
+                      bboxes=crop_bbxs, labels=labels, truncated=truncated,
+                      image_size=[self.width, self.height, self.channel])
+
+            # visualize_bbxs(crop_image, bbxs=crop_bbxs, centers=crop_centers)
+            idx += 1
+
+        print('{} images in: {}'.format(idx - 1, save_folder + '/imgs'))
+        print('{} xmls in: {}'.format(idx - 1, save_folder + '/xmls'))
 
     def nms(self, overlapThresh):
         # non_max_suppression_fast
@@ -164,7 +277,7 @@ class DataLoader(object):
         shuffled_y = self.y_train[permutation]
         return shuffled_x, shuffled_y
 
-
+    @staticmethod
     def random_rotation_2d(batch, max_angle):
         """ Randomly rotate an image by a random angle (-max_angle, max_angle).
         Arguments:
@@ -183,3 +296,10 @@ class DataLoader(object):
             else:
                 batch_rot[i] = batch[i]
         return batch_rot.reshape(size)
+
+if __name__ == '__main__':
+
+    from config import args
+    data = DataLoader(args)
+    data.write_crops(save_folder='data/test/whole', adjust_hist=True)
+

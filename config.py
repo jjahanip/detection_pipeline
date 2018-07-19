@@ -10,15 +10,16 @@ flags.DEFINE_string('trained_checkpoint', 'training/NeuN/model.ckpt-200000', 'Pa
 flags.DEFINE_string('input_shape', None, 'Comma delimited input shape e.g 300,300,3')
 
 # data
+flags.DEFINE_string('data_dir', 'data/test/whole', 'Path to the directory of input data')
+flags.DEFINE_string('c1', 'R2C0.tif', 'image 1 path')
+flags.DEFINE_string('c2', 'R2C1.tif', 'image 2 path')
+flags.DEFINE_string('c3', 'R2C3.tif', 'image 3 path')
+flags.DEFINE_integer('height', 300, 'Network input height size - crop large image with this height')
+flags.DEFINE_integer('width', 400, 'Network input width size - crop large image with this height')
+flags.DEFINE_integer('depth', None, 'Network input depth size (in the case of 3D input images)')
+flags.DEFINE_integer('channel', 2, 'Network input channel size')
 flags.DEFINE_boolean('data_augment', False, 'Adds augmentation to data')
 flags.DEFINE_integer('max_angle', 40, 'Maximum rotation angle along each axis; when applying augmentation')
-flags.DEFINE_integer('height', 200, 'Network input height size')
-flags.DEFINE_integer('width', 200, 'Network input width size')
-flags.DEFINE_integer('depth', None, 'Network input depth size (in the case of 3D input images)')
-flags.DEFINE_integer('channel', 3, 'Network input channel size')
-flags.DEFINE_string('img_1', 'data/test/hpc_crop/R2C0_crop_crop.tif', 'image 1 path')
-flags.DEFINE_string('img_2', 'data/test/hpc_crop/R2C1_crop_crop.tif', 'image 2 path')
-flags.DEFINE_string('img_3', 'data/test/hpc_crop/R2C3_crop_crop.tif', 'image 3 path')
 flags.DEFINE_integer('crop_overlap', 100, 'Network input channel size')
 
 # post processing
