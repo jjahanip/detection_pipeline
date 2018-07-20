@@ -144,37 +144,50 @@ def crop(images, topLeft, botRight, bbxs=None, centers=None):
 
     return cropped_images
 
-def bbxs_image(file_name, bbxs, image_size, color='red'):
+def bbxs_image(file_name, bbxs, image_size):
     '''
+    Save a binary image with bounding boxes
     :param file_name: tifffile to be saved
     :param bbxs: np.array [xmin ymin xmax ymax]
     :param image_size: [width height]
-    :param color: bounding box color
     :return:
     '''
 
-    box_pil = Image.new('RGB', image_size)
+    box_pil = Image.new('1', image_size)
     box_draw = ImageDraw.Draw(box_pil)
     for xmin, ymin, xmax, ymax in bbxs:
         (left, right, top, bottom) = (xmin, xmax, ymin, ymax)
         box_draw.line([(left, top), (left, bottom), (right, bottom),
-                       (right, top), (left, top)], width=2, fill=color)
+                       (right, top), (left, top)], width=2, fill=1)
     box_pil.save(file_name)
 
 
-def center_image(file_name, centers, image_size, color='red'):
+def center_image(file_name, centers, image_size, r=2):
     '''
+    Save a binary image with centers
     :param file_name: tifffile to be saved
-    :param bbxs: np.array [centroid_x centroid_y]
+    :param centers: np.array [centroid_x centroid_y]
     :param image_size: [width height]
-    :param color: center color
+    :param r : radius of center
     :return:
     '''
 
-    image = Image.new('RGB', image_size)
+    image = Image.new('1', image_size)
     center_draw = ImageDraw.Draw(image)
 
     for center in centers:
-        center_draw.point((center[0], center[1]), fill=color)
+        center_draw.ellipse((center[0]-r, center[1]-r, center[0]+r, center[1]+r), fill=1)
 
+    image.save(file_name)
+
+
+def boundary_image(file_name, boundaries):
+    '''
+    Save a binary image with borders
+    :param file_name: tifffile to be saved
+    :param boundary_image: np.array boundary mask
+    :return:
+    '''
+    image = Image.new('1', boundaries.shape[::-1])
+    image.putdata(np.ndarray.flatten(boundaries))
     image.save(file_name)
