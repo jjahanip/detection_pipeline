@@ -7,8 +7,9 @@ import scipy.spatial as spatial
 import warnings
 import skimage
 from skimage import exposure
-
-from lib.image_uitls import read_image_from_filenames, imadjust, visualize_bbxs
+import xml.etree.ElementTree as ET
+import itertools
+from lib.image_uitls import read_image_from_filenames, visualize_bbxs
 from lib.segmentation import GenerateBBoxfromSeeds
 from lib.ops import write_xml
 
@@ -50,13 +51,20 @@ class DataLoader(object):
     def centers(self):
         return self._centers
 
-    @centers.setter
-    def centers(self, value):
-        if self._bbxs is None:
-            self._centers = value
-        else:
-            print('Data has bbxs. Over-writting centers...')
-            self._centers = value
+    # @centers.setter
+    # def centers(self, value):
+    #     if self._bbxs is None:
+    #         self._centers = value
+    #     else:
+    #         print('Data has bbxs. Over-writting centers...')
+    #         self._centers = value
+
+    @staticmethod
+    def get_centers(bbxs):
+        centers = np.empty((bbxs.shape[0], 2), dtype=int)
+        centers[:, 0] = (bbxs[:, 0] + bbxs[:, 2]) // 2
+        centers[:, 1] = (bbxs[:, 1] + bbxs[:, 3]) // 2
+        return centers
 
     @property
     def bbxs(self):
@@ -65,12 +73,20 @@ class DataLoader(object):
     @bbxs.setter
     def bbxs(self, value):
         self._bbxs = value
+        self._centers = self.get_centers(value)
 
-        # set centers when bbxs are provided
-        centers = np.empty((self._bbxs.shape[0], 2), dtype=int)
-        centers[:, 0] = (self._bbxs[:, 0] + self._bbxs[:, 2]) // 2
-        centers[:, 1] = (self._bbxs[:, 1] + self._bbxs[:, 3]) // 2
-        self._centers = centers
+    def save_bbxs(self, filename):
+        # create a column for unique IDs
+        ids = np.arange(1, self._bbxs.shape[0] + 1)
+
+        # create numpy array for the table
+        table = np.hstack((ids, self._centers, self._bbxs))
+
+        fmt = '\t'.join(['%d'] * table.shape[1])
+        hdr = '\t'.join(['ID'] + ['centroid_x'] + ['centroid_y'] + ['xmin'] + ['ymin'] + ['xmax'] + ['ymax'])
+        cmts = ''
+
+        np.savetxt(filename, table, fmt=fmt, header=hdr, comments=cmts)
 
     @property
     def scores(self):
@@ -99,28 +115,46 @@ class DataLoader(object):
 
                 yield [j, i], crop_img
 
+    @staticmethod
+    def remove_close_centers(centers, scores=None, radius=3):
+        """ returns array of True and Flase for centers to keep(True) remove(False) """
 
-    def remove_close_centers(self, radius=3):
         # get groups of centers
-        tree = spatial.cKDTree(self._centers)
-        groups = tree.query_ball_point(self._centers, radius)
+        tree = spatial.cKDTree(centers)
+        groups = tree.query_ball_point(centers, radius)
 
-        # remove isolated and duplicated centers
+        # remove isolated centers
         groups = [group for group in groups if len(group) > 1]
-        groups = np.unique(groups, axis=0)
+
+        # if no groups, return all True
+        if len(groups) == 0:
+            return np.array([True] * centers.shape[0])
+
+        # remove duplicated groups
+        groups.sort()
+        groups = list(groups for groups,_ in itertools.groupby(groups))
 
         # remove the center with highest probability and add to to_be_removed list
         to_be_removed = []
         for i, group in enumerate(groups):
-            max_idx = np.argmax(self._scores[group])
+            if scores is not None:
+                max_idx = np.argmax(scores[group])
+            else:
+                # if we don't have the scores remove the first object
+                max_idx = 0
             to_be_removed.append(np.delete(groups[i], max_idx))
 
-        # remove extra centers and update centers, bbxs and scores
-        to_be_removed = np.unique(to_be_removed)
+        # find index of centers to be removed
+        to_be_removed = np.unique(list(itertools.chain.from_iterable(to_be_removed)))
 
         # update bbxs, centers and scores
-        self.bbxs = np.delete(self._bbxs, to_be_removed, axis=0)
-        self.scores = np.delete(self._scores, to_be_removed, axis=0)
+        # self.bbxs = np.delete(self._bbxs, to_be_removed, axis=0)
+
+        # if self._scores is not None:
+        #     self.scores = np.delete(self._scores, to_be_removed, axis=0)
+
+        # return invert of to_be_removed = to_keep
+        return np.isin(np.arange(centers.shape[0]), to_be_removed, invert=True)
 
     def write_crops(self, save_folder, adjust_hist=False):
 
@@ -209,6 +243,48 @@ class DataLoader(object):
 
         print('{} images in: {}'.format(idx - 1, save_folder + '/imgs'))
         print('{} xmls in: {}'.format(idx - 1, save_folder + '/xmls'))
+
+    def update_xmls(self, xml_dir, centers_radius=3):
+
+        to_be_deleted = []
+        to_be_added = []
+        for filename in os.listdir(xml_dir):
+
+            # read file
+            tree = ET.parse(os.path.join(xml_dir, filename))
+            source = tree.find('source')
+            corner = [int(c) for c in source.find('corner').text.split(',')]
+
+            size = tree.find('size')
+            crop_width = int(size.find('width').text)
+            crop_height = int(size.find('height').text)
+
+            # find objects in center (not close to the edge) of crop to be deleted from self.bbxs
+            to_be_deleted_crop = np.where((self._bbxs[:, 0] > corner[0] + 50) &
+                                          (self._bbxs[:, 1] > corner[1] + 50) &
+                                          (self._bbxs[:, 2] < corner[0] + crop_width - 50) &
+                                          (self._bbxs[:, 3] < corner[1] + crop_height - 50))[0]
+            to_be_deleted.append(to_be_deleted_crop) if len(to_be_deleted_crop) > 0 else None
+
+            # extract bbxs from xml file
+            for i, Obj in enumerate(tree.findall('object')):  # take the current animal
+                bndbox = Obj.find('bndbox')
+                box = np.array([int(bndbox.find('xmin').text),
+                                int(bndbox.find('ymin').text),
+                                int(bndbox.find('xmax').text),
+                                int(bndbox.find('ymax').text)])
+
+                # if box was inside the crop (not close to the edge) to be added to self.bbxs
+                if box[0] >= 50 and box[1] >= 50 and box[2] <= crop_width - 50 and box[3] <= crop_height - 50:
+                    box = box + np.array([corner[0], corner[1], corner[0], corner[1]])
+                    to_be_added.append(box)
+
+
+        # update the bbxs
+        to_be_deleted = [item for sublist in to_be_deleted for item in sublist]
+        self.bbxs = np.delete(self.bbxs, to_be_deleted, axis=0)
+        self.bbxs = np.vstack([self._bbxs, to_be_added])
+
 
     def nms(self, overlapThresh):
         # non_max_suppression_fast
@@ -300,6 +376,11 @@ class DataLoader(object):
 if __name__ == '__main__':
 
     from config import args
+    from lib.image_uitls import bbxs_image
     data = DataLoader(args)
-    data.write_crops(save_folder='data/test/whole', adjust_hist=True)
+    # data.write_crops(save_folder='data/test/whole', adjust_hist=True)
 
+    bbxs_image('data/test/whole/old_bbxs.tif', data.bbxs, data.image.shape[:2][::-1])
+    data.update_xmls(xml_dir='data/test/whole/xmls', centers_radius=4)
+    bbxs_image('data/test/whole/new_bbxs.tif', data.bbxs, data.image.shape[:2][::-1])
+    a = 1
