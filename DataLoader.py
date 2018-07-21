@@ -284,7 +284,7 @@ class DataLoader(object):
         to_be_deleted = [item for sublist in to_be_deleted for item in sublist]
         self.bbxs = np.delete(self.bbxs, to_be_deleted, axis=0)
         self.bbxs = np.vstack([self._bbxs, to_be_added])
-
+        self.bbxs = np.unique(self._bbxs)
 
     def nms(self, overlapThresh):
         # non_max_suppression_fast
@@ -383,4 +383,6 @@ if __name__ == '__main__':
     bbxs_image('data/test/whole/old_bbxs.tif', data.bbxs, data.image.shape[:2][::-1])
     data.update_xmls(xml_dir='data/test/whole/xmls', centers_radius=4)
     bbxs_image('data/test/whole/new_bbxs.tif', data.bbxs, data.image.shape[:2][::-1])
+
+    # TODO: add bbxs.txt or centers.txt as arg in config file
     a = 1
