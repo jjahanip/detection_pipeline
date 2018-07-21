@@ -144,27 +144,28 @@ def crop(images, topLeft, botRight, bbxs=None, centers=None):
 
     return cropped_images
 
-def bbxs_image(file_name, bbxs, image_size):
+
+def bbxs_image(file_name, bbxs, image_size, color='white'):
     '''
-    Save a binary image with bounding boxes
+    Save RGB image with bounding boxes
     :param file_name: tifffile to be saved
     :param bbxs: np.array [xmin ymin xmax ymax]
     :param image_size: [width height]
     :return:
     '''
 
-    box_pil = Image.new('1', image_size)
+    box_pil = Image.new('RGB', image_size)
     box_draw = ImageDraw.Draw(box_pil)
     for xmin, ymin, xmax, ymax in bbxs:
         (left, right, top, bottom) = (xmin, xmax, ymin, ymax)
         box_draw.line([(left, top), (left, bottom), (right, bottom),
-                       (right, top), (left, top)], width=2, fill=1)
+                       (right, top), (left, top)], width=2, fill=color)
     box_pil.save(file_name)
 
 
-def center_image(file_name, centers, image_size, r=2):
+def center_image(file_name, centers, image_size, r=2, color='white'):
     '''
-    Save a binary image with centers
+    Save RGB image with centers
     :param file_name: tifffile to be saved
     :param centers: np.array [centroid_x centroid_y]
     :param image_size: [width height]
@@ -172,22 +173,23 @@ def center_image(file_name, centers, image_size, r=2):
     :return:
     '''
 
-    image = Image.new('1', image_size)
+    image = Image.new('RGB', image_size)
     center_draw = ImageDraw.Draw(image)
 
     for center in centers:
-        center_draw.ellipse((center[0]-r, center[1]-r, center[0]+r, center[1]+r), fill=1)
+        center_draw.ellipse((center[0]-r, center[1]-r, center[0]+r, center[1]+r), fill=color)
 
     image.save(file_name)
 
 
 def boundary_image(file_name, boundaries):
     '''
-    Save a binary image with borders
+    Save RGB image with borders
     :param file_name: tifffile to be saved
-    :param boundary_image: np.array boundary mask
+    :param boundary_image: np.array boundary mask [0-1]
     :return:
     '''
-    image = Image.new('1', boundaries.shape[::-1])
+    boundaries = (boundaries * 255).astype('uint8')
+    image = Image.new('L', boundaries.shape[::-1])
     image.putdata(np.ndarray.flatten(boundaries))
-    image.save(file_name)
+    image.convert('RGB').save(file_name)
