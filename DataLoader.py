@@ -18,6 +18,8 @@ class DataLoader(object):
 
     def __init__(self, config):
 
+        self.config = config
+
         # read all images
         image_filenames = []
         for i in range(config.channel):
@@ -25,21 +27,21 @@ class DataLoader(object):
             image_filenames.append(os.path.join(config.data_dir, filename))
         self.image = read_image_from_filenames(image_filenames, to_ubyte=False)
 
-        self.height = config.height
-        self.width = config.width
+        # self.height = config.height
+        # self.width = config.width
         self.channel = config.channel
         self.ovrlp = config.crop_overlap
 
         # read centers if exist
-        if os.path.isfile(os.path.join(config.data_dir, 'centers.txt')):
-            centers_table = pd.read_csv(os.path.join(config.data_dir, 'centers.txt'), sep='\t')
+        if os.path.isfile(os.path.join(config.data_dir, config.centers_file)):
+            centers_table = pd.read_csv(os.path.join(config.data_dir, config.centers_file), sep='\t')
             self.centers = centers_table[['centriod_x', 'centriod_y']].values
         else:
             self._centers = None
 
         # read bbxs if exist
-        if os.path.isfile(os.path.join(config.data_dir, 'bbxs.txt')):
-            bbxs_table = pd.read_csv(os.path.join(config.data_dir, 'bbxs.txt'), sep='\t')
+        if os.path.isfile(os.path.join(config.data_dir, config.bbxs_file)):
+            bbxs_table = pd.read_csv(os.path.join(config.data_dir, config.bbxs_file), sep='\t')
             self.bbxs = bbxs_table[['xmin', 'ymin', 'xmax', 'ymax']].values
         else:
             self._bbxs = None
@@ -77,7 +79,7 @@ class DataLoader(object):
 
     def save_bbxs(self, filename):
         # create a column for unique IDs
-        ids = np.arange(1, self._bbxs.shape[0] + 1)
+        ids = np.expand_dims(np.arange(1, self._bbxs.shape[0] + 1), axis=1)
 
         # create numpy array for the table
         table = np.hstack((ids, self._centers, self._bbxs))
@@ -96,28 +98,28 @@ class DataLoader(object):
     def scores(self, value):
         self._scores = value
 
-    def next_crop(self):
+    def next_crop(self, crop_width, crop_height, crop_overlap):
 
         # get image information
         img_rows, img_cols, img_ch = self.image.shape  # img_rows = height , img_cols = width
-        max_bar = (img_rows // (self.height - self.ovrlp) + 1) * (img_cols // (self.width - self.ovrlp) + 1)
+        max_bar = (img_rows // (crop_height - crop_overlap) + 1) * (img_cols // (crop_width - crop_overlap) + 1)
 
         bar = progressbar.ProgressBar(max_value=max_bar)
 
         bar.start()
         bar_idx = 1
         # get each crop
-        for i in range(0, img_rows, self.height - self.ovrlp):
-            for j in range(0, img_cols, self.width - self.ovrlp):
+        for i in range(0, img_rows, crop_height - crop_overlap):
+            for j in range(0, img_cols, crop_width - crop_overlap):
 
                 # update bar
                 bar.update(bar_idx)
 
                 # temporary store the values of crop
-                temp = self.image[i:i + self.height, j:j + self.width, :]
+                temp = self.image[i:i + crop_height, j:j + crop_width, :]
 
                 # create new array to copy temporary stored values
-                crop_img = np.zeros((self.height, self.width, self.image.shape[-1]), dtype=self.image.dtype)
+                crop_img = np.zeros((crop_height, crop_width, self.image.shape[-1]), dtype=self.image.dtype)
                 crop_img[:temp.shape[0], :temp.shape[1], :] = temp
 
                 yield [j, i], crop_img
@@ -165,7 +167,7 @@ class DataLoader(object):
         # return invert of to_be_removed = to_keep
         return np.isin(np.arange(centers.shape[0]), to_be_removed, invert=True)
 
-    def write_crops(self, save_folder, adjust_hist=False):
+    def write_crops(self, save_folder, crop_width, crop_height, crop_overlap, adjust_hist=False):
 
         if not os.path.isdir(save_folder):
             os.mkdir(save_folder)
@@ -177,7 +179,7 @@ class DataLoader(object):
         if 'xmls' not in dir_list:
             os.mkdir(os.path.join(save_folder, 'xmls'))
 
-        crop_gen = self.next_crop()
+        crop_gen = self.next_crop(crop_width, crop_height, crop_overlap)
         idx = 1
         while True:
             try:
@@ -188,9 +190,9 @@ class DataLoader(object):
             if self._bbxs is not None:
                 # find cells that center is in the crop
                 crop_idx = np.where(((self.centers[:, 0] > j) &
-                                     (self.centers[:, 0] < j + self.width) &
+                                     (self.centers[:, 0] < j + crop_width) &
                                      (self.centers[:, 1] > i) &
-                                     (self.centers[:, 1] < i + self.height)),
+                                     (self.centers[:, 1] < i + crop_height)),
                                     True, False)
 
                 if not np.any(crop_idx):  # if no cell in the crop, SKIP
@@ -221,15 +223,15 @@ class DataLoader(object):
             # find truncated objects in crop
             crop_truncated = np.where(((crop_bbxs[:, 0] < 0) |
                                        (crop_bbxs[:, 1] < 0) |
-                                       (crop_bbxs[:, 2] > self.width) |
-                                       (crop_bbxs[:, 3] > self.height)), True, False)
+                                       (crop_bbxs[:, 2] > crop_width) |
+                                       (crop_bbxs[:, 3] > crop_height)), True, False)
             # clip truncated objects
             if np.any(crop_truncated):
-                crop_bbxs[:, [0, 2]] = np.clip(crop_bbxs[:, [0, 2]], 1, self.width - 1)
-                crop_bbxs[:, [1, 3]] = np.clip(crop_bbxs[:, [1, 3]], 1, self.height - 1)
+                crop_bbxs[:, [0, 2]] = np.clip(crop_bbxs[:, [0, 2]], 1, crop_width - 1)
+                crop_bbxs[:, [1, 3]] = np.clip(crop_bbxs[:, [1, 3]], 1, crop_height - 1)
 
             # save image and xml:
-            filename = '{:05}'.format(idx)
+            filename = '{}_{}'.format(j, i)  # save name as x_y format of top left corner of crop
             if adjust_hist:
                 # for 16bit images only.
                 # TODO: general form for all types
@@ -245,7 +247,7 @@ class DataLoader(object):
             truncated = crop_truncated * 1
             write_xml(os.path.join(save_folder, 'xmls', filename + '.xml'), corner=[j, i],
                       bboxes=crop_bbxs, labels=labels, truncated=truncated,
-                      image_size=[self.width, self.height, self.channel])
+                      image_size=[crop_width, crop_height, self.channel])
 
             # visualize_bbxs(crop_image, bbxs=crop_bbxs, centers=crop_centers)
             idx += 1
@@ -253,7 +255,7 @@ class DataLoader(object):
         print('{} images in: {}'.format(idx - 1, save_folder + '/imgs'))
         print('{} xmls in: {}'.format(idx - 1, save_folder + '/xmls'))
 
-    def update_xmls(self, xml_dir, centers_radius=3):
+    def update_xmls(self, xml_dir, save_fname):
 
         to_be_deleted = []
         to_be_added = []
@@ -261,8 +263,7 @@ class DataLoader(object):
 
             # read file
             tree = ET.parse(os.path.join(xml_dir, filename))
-            source = tree.find('source')
-            corner = [int(c) for c in source.find('corner').text.split(',')]
+            corner = list(map(int, os.path.basename(filename).split('.')[0].split('_')))
 
             size = tree.find('size')
             crop_width = int(size.find('width').text)
@@ -288,12 +289,16 @@ class DataLoader(object):
                     box = box + np.array([corner[0], corner[1], corner[0], corner[1]])
                     to_be_added.append(box)
 
-
         # update the bbxs
         to_be_deleted = [item for sublist in to_be_deleted for item in sublist]
         self.bbxs = np.delete(self.bbxs, to_be_deleted, axis=0)
         self.bbxs = np.vstack([self._bbxs, to_be_added])
-        self.bbxs = np.unique(self._bbxs)
+        self.bbxs = np.unique(self._bbxs, axis=0)
+
+        self.save_bbxs(os.path.join(self.config.data_dir, save_fname))
+        print('{} updated with new objects in {}'.format(self.config.bbxs_file, xml_dir))
+        print('new bbxs saved in {}'.format(os.path.join(self.config.data_dir, save_fname)))
+
 
     def nms(self, overlapThresh):
         # non_max_suppression_fast
@@ -381,17 +386,3 @@ class DataLoader(object):
             else:
                 batch_rot[i] = batch[i]
         return batch_rot.reshape(size)
-
-if __name__ == '__main__':
-
-    from config import args
-    from lib.image_uitls import bbxs_image
-    data = DataLoader(args)
-    # data.write_crops(save_folder='data/test/whole', adjust_hist=True)
-    # bbxs_image('data/test/whole/old_bbxs.tif', data.bbxs, data.image.shape[:2][::-1])
-
-    data.update_xmls(xml_dir='data/test/whole/xmls', centers_radius=4)
-    bbxs_image('data/test/whole/new_bbxs.tif', data.bbxs, data.image.shape[:2][::-1])
-
-    # TODO: add bbxs.txt or centers.txt as arg in config file
-    a = 1
