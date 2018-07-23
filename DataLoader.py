@@ -12,7 +12,7 @@ import itertools
 from lib.image_uitls import read_image_from_filenames, visualize_bbxs
 from lib.segmentation import GenerateBBoxfromSeeds
 from lib.ops import write_xml
-
+import progressbar
 
 class DataLoader(object):
 
@@ -100,11 +100,18 @@ class DataLoader(object):
 
         # get image information
         img_rows, img_cols, img_ch = self.image.shape  # img_rows = height , img_cols = width
-        crop_size = (self.width, self.height)
+        max_bar = (img_rows // (self.height - self.ovrlp) + 1) * (img_cols // (self.width - self.ovrlp) + 1)
 
+        bar = progressbar.ProgressBar(max_value=max_bar)
+
+        bar.start()
+        bar_idx = 1
         # get each crop
         for i in range(0, img_rows, self.height - self.ovrlp):
             for j in range(0, img_cols, self.width - self.ovrlp):
+
+                # update bar
+                bar.update(bar_idx)
 
                 # temporary store the values of crop
                 temp = self.image[i:i + self.height, j:j + self.width, :]
@@ -114,6 +121,8 @@ class DataLoader(object):
                 crop_img[:temp.shape[0], :temp.shape[1], :] = temp
 
                 yield [j, i], crop_img
+                bar_idx += 1
+        bar.finish()
 
     @staticmethod
     def remove_close_centers(centers, scores=None, radius=3):
@@ -379,8 +388,8 @@ if __name__ == '__main__':
     from lib.image_uitls import bbxs_image
     data = DataLoader(args)
     # data.write_crops(save_folder='data/test/whole', adjust_hist=True)
+    # bbxs_image('data/test/whole/old_bbxs.tif', data.bbxs, data.image.shape[:2][::-1])
 
-    bbxs_image('data/test/whole/old_bbxs.tif', data.bbxs, data.image.shape[:2][::-1])
     data.update_xmls(xml_dir='data/test/whole/xmls', centers_radius=4)
     bbxs_image('data/test/whole/new_bbxs.tif', data.bbxs, data.image.shape[:2][::-1])
 
