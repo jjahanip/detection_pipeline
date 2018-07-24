@@ -21,12 +21,14 @@ from lib.ops import non_max_suppression_fast
 class JNet(object):
     def __init__(self, conf):
 
+        self.conf = conf
+
+        self.batch_size = conf.batch_size
+        self.skip_edge = conf.skip_edge
         if conf.input_shape is None:
             self.input_shape = (None, None, None, 3)
         else:
             self.input_shape = conf.input_shape
-
-        self.conf = conf
 
         self.input = None
         self.outputs = None
@@ -103,30 +105,26 @@ class JNet(object):
 
         return out_dict
 
-    def test(self):
-        data = DataLoader(self.conf)
+    def test(self, data):
+        # data = DataLoader(self.conf)
 
         config = tf.ConfigProto()
         config.gpu_options.allow_growth = True
         with tf.Session(config=config) as sess:
             self.saver.restore(sess, self.conf.trained_checkpoint)
 
-            max_bar = np.prod(data.image.shape[:2] // (np.array([data.height, data.width]) - data.ovrlp) + 1)\
-                      // data.batch_size + 1
-            bar = progressbar.ProgressBar(max_value=max_bar)
             crop_gen = data.next_crop()
             iterate = True
             bbxs = []
             scores = []
             while iterate:
-                bar.update(bar.value + 1)
 
                 # make np arrays for generator
-                batch_x = np.empty(shape=(data.batch_size, data.height, data.width, data.channel))
-                corner = np.empty(shape=(data.batch_size, 2))
+                batch_x = np.empty(shape=(self.batch_size, data.height, data.width, data.channel))
+                corner = np.empty(shape=(self.batch_size, 2))
 
                 try:
-                    for i in range(data.batch_size):
+                    for i in range(self.batch_size):
                         corner[i, :], batch_x[i, :, :, :] = next(crop_gen)
                 except StopIteration:
                     iterate = False
@@ -136,44 +134,63 @@ class JNet(object):
 
                 out_dict = self.safe_run(sess, feed_dict={self.input: batch_x}, output_tensor=self.outputs)
 
-                for i in range(data.batch_size):
+                for i in range(self.batch_size):
                     keep_boxes = out_dict["detection_scores"][i, :] > self.conf.score_threshold
 
                     if not np.any(keep_boxes):
                         continue
 
                     box = out_dict["detection_boxes"][i, :][keep_boxes]
+                    score = out_dict["detection_scores"][i, :][keep_boxes]
+
                     box = box[:, [1, 0, 3, 2]]      # reformat to: xmin, ymin, xmax, ymax
                     # rescale from [0-1] to the crop size
-                    box[:, [0, 2]] = box[:, [0, 2]] * self.conf.width
-                    box[:, [1, 3]] = box[:, [1, 3]] * self.conf.height
+                    box[:, [0, 2]] = box[:, [0, 2]] * data.width
+                    box[:, [1, 3]] = box[:, [1, 3]] * data.height
 
                     # remove very large bounding boxes
-                    box = box[(box[:, 2] - box[:, 0] < 100) | (box[:, 3] - box[:, 1] < 100), :]
-                    if box.size == 0:    # if no bounding box after removing large ones
+                    idx = np.where((box[:, 2] - box[:, 0] < 100) | (box[:, 3] - box[:, 1] < 100), True, False)
+                    box = box[idx, :]
+                    score = score[idx]
+                    if not np.any(idx):    # if no bounding box after removing large ones
                         continue
 
-                    # visualize_bbxs(batch_x[i, :, :, :].astype('uint8'), bbxs=box, adjust_hist=True)
+                    # keep boxes inside the crop (not close to the edge)
+                    idx = np.where((box[:, 0] >= self.skip_edge) &
+                                   (box[:, 1] >= self.skip_edge) &
+                                   (box[:, 2] <= data.width - self.skip_edge) &
+                                   (box[:, 3] <= data.height - self.skip_edge), True, False)
+                    box = box[idx, :]
+                    score = score[idx]
+                    if not np.any(idx):     # if no bounding box after removing edge ones
+                        continue
+
+                    from skimage import exposure
+                    show_image = exposure.rescale_intensity((batch_x[i, :, :, :]).astype('uint8'), in_range='image', out_range='dtype')
+                    visualize_bbxs(show_image, bbxs=box, save=True)
 
                     box[:, [0, 2]] += corner[i][0]
                     box[:, [1, 3]] += corner[i][1]
 
                     bbxs.append(box.astype(int))
-
-                    # score
-                    score = out_dict["detection_scores"][i, :][keep_boxes]
                     scores.append(score)
 
-        bar.finish()
+        # np.save(os.path.join(self.conf.data_dir, 'boxes.npy'), np.array(bbxs))
+        # np.save(os.path.join(self.conf.data_dir, 'boxes.npy'), np.array(scores))
 
-        # to be added: rotate crop
         data.bbxs = np.concatenate(bbxs)
         data.scores = np.concatenate(scores)
 
-        data.nms(overlapThresh=self.conf.nms_iou)
-        data.remove_close_centers(radius=3)
+        keep_idx = data.remove_close_centers(centers=data.centers, scores=data.scores, radius=3)
+        data.bbxs = data.bbxs[keep_idx, :]
+        data.scores = data.scores[keep_idx]
 
-        # bbxs_image('data/test/hpc_crop/bbxs_nms_tf.tif', data.bbxs, (6000, 4000), color='red')
-        bbxs_image('data/test/hpc_crop/bbxs.tif', data.bbxs, (6000, 4000))
-        center_image('data/test/hpc_crop/centers.tif', data.centers, (6000, 4000))
+        keep_idx = data.nms(data.bbxs, overlapThresh=self.conf.nms_iou)
+        data.bbxs = data.bbxs[keep_idx, :]
+        data.scores = data.scores[keep_idx]
+
+        # to be added: rotate crop
+
+        bbxs_image(os.path.join(self.conf.data_dir, 'bbxs.tif'), data.bbxs, data.image.shape[:2][::-1])
+        center_image(os.path.join(self.conf.data_dir, 'centers.tif'), data.centers, data.image.shape[:2][::-1])
 

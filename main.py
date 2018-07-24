@@ -5,6 +5,7 @@ from DataLoader import DataLoader
 
 from lib.image_uitls import bbxs_image
 
+
 def main(_):
     if args.mode not in ['train', 'test', 'write_crops', 'update_xmls']:
         print('invalid mode: ', args.mode)
@@ -18,7 +19,7 @@ def main(_):
             if args.mode == 'train':
                 model.train()
             elif args.mode == 'test':
-                model.test()
+                model.test(data)
         elif args.mode == 'write_crops':
             data.write_crops(args.save_folder, args.crop_width, args.crop_height, args.crop_overlap,
                              adjust_hist=args.adjust_hist)

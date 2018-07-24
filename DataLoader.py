@@ -14,6 +14,7 @@ from lib.segmentation import GenerateBBoxfromSeeds
 from lib.ops import write_xml
 import progressbar
 
+
 class DataLoader(object):
 
     def __init__(self, config):
@@ -27,10 +28,10 @@ class DataLoader(object):
             image_filenames.append(os.path.join(config.data_dir, filename))
         self.image = read_image_from_filenames(image_filenames, to_ubyte=False)
 
-        # self.height = config.height
-        # self.width = config.width
+        self.height = config.height
+        self.width = config.width
         self.channel = config.channel
-        self.ovrlp = config.crop_overlap
+        self.overlap = config.overlap
 
         # read centers if exist
         if os.path.isfile(os.path.join(config.data_dir, config.centers_file)):
@@ -48,18 +49,9 @@ class DataLoader(object):
 
         self._scores = None
 
-
     @property
     def centers(self):
         return self._centers
-
-    # @centers.setter
-    # def centers(self, value):
-    #     if self._bbxs is None:
-    #         self._centers = value
-    #     else:
-    #         print('Data has bbxs. Over-writting centers...')
-    #         self._centers = value
 
     @staticmethod
     def get_centers(bbxs):
@@ -98,7 +90,14 @@ class DataLoader(object):
     def scores(self, value):
         self._scores = value
 
-    def next_crop(self, crop_width, crop_height, crop_overlap):
+    def next_crop(self, crop_width=None, crop_height=None, crop_overlap=None):
+
+        if crop_width is None:
+            crop_width = self.width
+        if crop_height is None:
+            crop_height = self.height
+        if crop_overlap is None:
+            crop_overlap = self.overlap
 
         # get image information
         img_rows, img_cols, img_ch = self.image.shape  # img_rows = height , img_cols = width
@@ -158,16 +157,76 @@ class DataLoader(object):
         # find index of centers to be removed
         to_be_removed = np.unique(list(itertools.chain.from_iterable(to_be_removed)))
 
-        # update bbxs, centers and scores
-        # self.bbxs = np.delete(self._bbxs, to_be_removed, axis=0)
-
-        # if self._scores is not None:
-        #     self.scores = np.delete(self._scores, to_be_removed, axis=0)
-
         # return invert of to_be_removed = to_keep
         return np.isin(np.arange(centers.shape[0]), to_be_removed, invert=True)
 
+    @staticmethod
+    def nms(boxes, overlapThresh=.7):
+        """ returns array of True and Flase for centers to keep(True) remove(False) """
+
+        # non_max_suppression_fast
+        # Malisiewicz et al.
+        # if there are no boxes, return an empty list
+        if len(boxes) == 0:
+            return []
+
+        # if the bounding boxes integers, convert them to floats --
+        # this is important since we'll be doing a bunch of divisions
+        if boxes.dtype.kind == "i":
+            boxes = boxes.astype("float")
+
+        # initialize the list of picked indexes
+        pick = []
+
+        # grab the coordinates of the bounding boxes
+        x1 = boxes[:, 0]
+        y1 = boxes[:, 1]
+        x2 = boxes[:, 2]
+        y2 = boxes[:, 3]
+
+        # compute the area of the bounding boxes and sort the bounding
+        # boxes by the bottom-right y-coordinate of the bounding box
+        area = (x2 - x1 + 1) * (y2 - y1 + 1)
+        idxs = np.argsort(y2)
+
+        # keep looping while some indexes still remain in the indexes
+        # list
+        while len(idxs) > 0:
+            # grab the last index in the indexes list and add the
+            # index value to the list of picked indexes
+            last = len(idxs) - 1
+            i = idxs[last]
+            pick.append(i)
+
+            # find the largest (x, y) coordinates for the start of
+            # the bounding box and the smallest (x, y) coordinates
+            # for the end of the bounding box
+            xx1 = np.maximum(x1[i], x1[idxs[:last]])
+            yy1 = np.maximum(y1[i], y1[idxs[:last]])
+            xx2 = np.minimum(x2[i], x2[idxs[:last]])
+            yy2 = np.minimum(y2[i], y2[idxs[:last]])
+
+            # compute the width and height of the bounding box
+            w = np.maximum(0, xx2 - xx1 + 1)
+            h = np.maximum(0, yy2 - yy1 + 1)
+
+            # compute the ratio of overlap
+            overlap = (w * h) / area[idxs[:last]]
+
+            # delete all indexes from the index list that have
+            idxs = np.delete(idxs, np.concatenate(([last],
+                                                   np.where(overlap > overlapThresh)[0])))
+
+        return pick
+
     def write_crops(self, save_folder, crop_width, crop_height, crop_overlap, adjust_hist=False):
+
+        if crop_width is None:
+            crop_width = self.width
+        if crop_height is None:
+            crop_width = self.height
+        if crop_overlap is None:
+            crop_width = self.overlap
 
         if not os.path.isdir(save_folder):
             os.mkdir(save_folder)
@@ -179,7 +238,7 @@ class DataLoader(object):
         if 'xmls' not in dir_list:
             os.mkdir(os.path.join(save_folder, 'xmls'))
 
-        crop_gen = self.next_crop(crop_width, crop_height, crop_overlap)
+        crop_gen = self.next_crop(crop_width=crop_width, crop_height=crop_height, crop_overlap=crop_overlap)
         idx = 1
         while True:
             try:
@@ -298,67 +357,6 @@ class DataLoader(object):
         self.save_bbxs(os.path.join(self.config.data_dir, save_fname))
         print('{} updated with new objects in {}'.format(self.config.bbxs_file, xml_dir))
         print('new bbxs saved in {}'.format(os.path.join(self.config.data_dir, save_fname)))
-
-
-    def nms(self, overlapThresh):
-        # non_max_suppression_fast
-        # Malisiewicz et al.
-        # if there are no boxes, return an empty list
-        boxes = self._bbxs
-        if len(boxes) == 0:
-            return []
-
-        # if the bounding boxes integers, convert them to floats --
-        # this is important since we'll be doing a bunch of divisions
-        if boxes.dtype.kind == "i":
-            boxes = boxes.astype("float")
-
-        # initialize the list of picked indexes
-        pick = []
-
-        # grab the coordinates of the bounding boxes
-        x1 = boxes[:, 0]
-        y1 = boxes[:, 1]
-        x2 = boxes[:, 2]
-        y2 = boxes[:, 3]
-
-        # compute the area of the bounding boxes and sort the bounding
-        # boxes by the bottom-right y-coordinate of the bounding box
-        area = (x2 - x1 + 1) * (y2 - y1 + 1)
-        idxs = np.argsort(y2)
-
-        # keep looping while some indexes still remain in the indexes
-        # list
-        while len(idxs) > 0:
-            # grab the last index in the indexes list and add the
-            # index value to the list of picked indexes
-            last = len(idxs) - 1
-            i = idxs[last]
-            pick.append(i)
-
-            # find the largest (x, y) coordinates for the start of
-            # the bounding box and the smallest (x, y) coordinates
-            # for the end of the bounding box
-            xx1 = np.maximum(x1[i], x1[idxs[:last]])
-            yy1 = np.maximum(y1[i], y1[idxs[:last]])
-            xx2 = np.minimum(x2[i], x2[idxs[:last]])
-            yy2 = np.minimum(y2[i], y2[idxs[:last]])
-
-            # compute the width and height of the bounding box
-            w = np.maximum(0, xx2 - xx1 + 1)
-            h = np.maximum(0, yy2 - yy1 + 1)
-
-            # compute the ratio of overlap
-            overlap = (w * h) / area[idxs[:last]]
-
-            # delete all indexes from the index list that have
-            idxs = np.delete(idxs, np.concatenate(([last],
-                                                   np.where(overlap > overlapThresh)[0])))
-
-        # return only the bounding boxes that were picked using the
-        # integer data type
-        self.bbxs = boxes[pick].astype("int")
-        self.scores = self._scores[pick]
 
     def randomize(self):
         """ Randomizes the order of data samples and their corresponding labels"""
