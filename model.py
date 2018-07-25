@@ -132,7 +132,33 @@ class JNet(object):
                 # temp
                 batch_x = batch_x / 256
 
-                out_dict = self.safe_run(sess, feed_dict={self.input: batch_x}, output_tensor=self.outputs)
+                out_org = self.safe_run(sess, feed_dict={self.input: batch_x}, output_tensor=self.outputs)
+
+                # crop augmentation
+                if self.conf.crop_augmentation == 'rot90':
+                    out_aug = self.safe_run(sess, feed_dict={self.input: tf.image.rot90(batch_x).eval()},
+                                                 output_tensor=self.outputs)
+                    out_aug['detection_boxes'][:, :, [0, 2]] = np.subtract(1, out_aug['detection_boxes'][:, :, [0, 2]])
+                    out_aug['detection_boxes'] = out_aug['detection_boxes'][:, :, [1, 0, 3, 2]]
+
+                elif self.conf.crop_augmentation == 'flip_left_right':
+                    out_aug = self.safe_run(sess, feed_dict={self.input: tf.image.flip_left_right(batch_x).eval()},
+                                            output_tensor=self.outputs)
+                    out_aug['detection_boxes'][:, :, [1, 3]] = np.subtract(1, out_aug['detection_boxes'][:, :, [1, 3]])
+
+                if self.conf.crop_augmentation is not None:
+                    out_dict = {}
+                    out_dict.update({'detection_boxes': np.concatenate((out_org['detection_boxes'],
+                                                                        out_aug['detection_boxes']),
+                                                                       axis=1)})
+                    out_dict.update({'detection_scores': np.concatenate((out_org['detection_scores'],
+                                                                         out_aug['detection_scores']),
+                                                                        axis=1)})
+                    out_dict.update({'detection_classes': np.concatenate((out_org['detection_classes'],
+                                                                          out_aug['detection_classes']),
+                                                                         axis=1)})
+                else:
+                    out_dict = out_org
 
                 for i in range(self.batch_size):
                     keep_boxes = out_dict["detection_scores"][i, :] > self.conf.score_threshold
@@ -165,6 +191,12 @@ class JNet(object):
                     if not np.any(idx):     # if no bounding box after removing edge ones
                         continue
 
+                    # non-max-suppression
+                    idx = tf.image.non_max_suppression(np.array(box), score, len(box), iou_threshold=0.5).eval()
+                    box = box[idx, :]
+                    score = score[idx]
+
+
                     from skimage import exposure
                     show_image = exposure.rescale_intensity((batch_x[i, :, :, :]).astype('uint8'), in_range='image', out_range='dtype')
                     visualize_bbxs(show_image, bbxs=box, save=True)
@@ -191,6 +223,6 @@ class JNet(object):
 
         # to be added: rotate crop
 
-        bbxs_image(os.path.join(self.conf.data_dir, 'bbxs.tif'), data.bbxs, data.image.shape[:2][::-1])
-        center_image(os.path.join(self.conf.data_dir, 'centers.tif'), data.centers, data.image.shape[:2][::-1])
+        bbxs_image(os.path.join(self.conf.data_dir, 'bbxs_with_flip.tif'), data.bbxs, data.image.shape[:2][::-1])
+        center_image(os.path.join(self.conf.data_dir, 'centers_with_flip.tif'), data.centers, data.image.shape[:2][::-1])
 
