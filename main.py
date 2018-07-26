@@ -7,7 +7,7 @@ from lib.image_uitls import bbxs_image
 
 
 def main(_):
-    if args.mode not in ['train', 'test', 'write_crops', 'update_xmls']:
+    if args.mode not in ['train', 'test', 'write_crops', 'update_xmls', 'create_tfrecord']:
         print('invalid mode: ', args.mode)
         print("Please input a mode: {}".format(x for x in ['train', 'test', 'write_crops', 'update_xmls']))
     else:
@@ -28,7 +28,6 @@ def main(_):
         elif args.mode == 'update_xmls':
             data.update_xmls(xml_dir='data/test/whole/xmls', save_fname=args.new_bbxs)
             bbxs_image('data/test/whole/new_bbxs.tif', data.bbxs, data.image.shape[:2][::-1])
-
 
 if __name__ == '__main__':
     # configure which gpu or cpu to use

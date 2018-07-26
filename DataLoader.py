@@ -125,6 +125,59 @@ class DataLoader(object):
                 bar_idx += 1
         bar.finish()
 
+    def get_bbxs_from_image(self, image, corner):
+
+        [j, i] = corner
+        [image_width, image_height] = image.shape[:2][::-1]
+
+        # at this point we can only extract bbxs provided the centers
+        # TODO: add section fully automatic detection
+        # find cells that center is in the crop
+        idx = np.where(((self.centers[:, 0] > j) &
+                        (self.centers[:, 0] < j + image_width) &
+                        (self.centers[:, 1] > i) &
+                        (self.centers[:, 1] < i + image_height)),
+                       True, False)
+
+        # if user provides the bounding boxes, extract them
+        if self._bbxs is not None:
+            if not np.any(idx):  # if no cell in the crop, SKIP
+                return None, None
+
+            # extract bbxs in the crop
+            crop_bbxs = self.bbxs[idx, :]
+            # shift the x & y values based on crop size
+            crop_bbxs[:, [0, 2]] = crop_bbxs[:, [0, 2]] - j
+            crop_bbxs[:, [1, 3]] = crop_bbxs[:, [1, 3]] - i
+
+        # if user provides the centers, run segmentation to extract bounding boxes
+        elif self._centers is not None:
+            crop_centers = self.centers[idx, :]
+
+            # shift the x & y values based on crop size
+            crop_centers[:, 0] = crop_centers[:, 0] - j
+            crop_centers[:, 1] = crop_centers[:, 1] - i
+
+            # generate bounding boxes using segmentation
+            dapi = np.copy(image[:, :, 0])
+            # for 16bit images only.
+            # TODO: general form for all types
+            dapi = exposure.rescale_intensity((dapi // 256).astype('uint8'),
+                                              in_range='image', out_range='dtype')
+            crop_bbxs = GenerateBBoxfromSeeds(dapi, crop_centers)
+
+        # find truncated objects in crop
+        crop_truncated = np.where(((crop_bbxs[:, 0] < 0) |
+                                   (crop_bbxs[:, 1] < 0) |
+                                   (crop_bbxs[:, 2] > image_width) |
+                                   (crop_bbxs[:, 3] > image_height)), True, False)
+        # clip truncated objects
+        if np.any(crop_truncated):
+            crop_bbxs[:, [0, 2]] = np.clip(crop_bbxs[:, [0, 2]], 1, image_width - 1)
+            crop_bbxs[:, [1, 3]] = np.clip(crop_bbxs[:, [1, 3]], 1, image_height - 1)
+
+        return crop_bbxs, crop_truncated
+
     @staticmethod
     def remove_close_centers(centers, scores=None, radius=3):
         """ returns array of True and Flase for centers to keep(True) remove(False) """
@@ -219,14 +272,14 @@ class DataLoader(object):
 
         return pick
 
-    def write_crops(self, save_folder, crop_width, crop_height, crop_overlap, adjust_hist=False):
+    def write_crops(self, save_folder, crop_width=None, crop_height=None, crop_overlap=None, adjust_hist=False):
 
         if crop_width is None:
             crop_width = self.width
         if crop_height is None:
-            crop_width = self.height
+            crop_height = self.height
         if crop_overlap is None:
-            crop_width = self.overlap
+            crop_overlap = self.overlap
 
         if not os.path.isdir(save_folder):
             os.mkdir(save_folder)
@@ -246,48 +299,10 @@ class DataLoader(object):
             except StopIteration:
                 break
 
-            if self._bbxs is not None:
-                # find cells that center is in the crop
-                crop_idx = np.where(((self.centers[:, 0] > j) &
-                                     (self.centers[:, 0] < j + crop_width) &
-                                     (self.centers[:, 1] > i) &
-                                     (self.centers[:, 1] < i + crop_height)),
-                                    True, False)
+            crop_bbxs, crop_truncated = self.get_bbxs_from_image(crop_image, [j, i])
 
-                if not np.any(crop_idx):  # if no cell in the crop, SKIP
-                    continue
-
-            crop_centers = self.centers[crop_idx, :]
-
-            # shift the x & y values based on crop size
-            crop_centers[:, 0] = crop_centers[:, 0] - j
-            crop_centers[:, 1] = crop_centers[:, 1] - i
-
-            # if user provides the bounding boxes
-            if self._bbxs is not None:
-                # extract bbxs in the crop
-                crop_bbxs = self.bbxs[crop_idx, :]
-                # shift the x & y values based on crop size
-                crop_bbxs[:, [0, 2]] = crop_bbxs[:, [0, 2]] - j
-                crop_bbxs[:, [1, 3]] = crop_bbxs[:, [1, 3]] - i
-            else:
-                # generate bounding boxes using segmentation
-                dapi = np.copy(crop_image[:, :, 0])
-                # for 16bit images only.
-                # TODO: general form for all types
-                dapi = exposure.rescale_intensity((dapi // 256).astype('uint8'),
-                                                  in_range='image', out_range='dtype')
-                crop_bbxs = GenerateBBoxfromSeeds(dapi, crop_centers)
-
-            # find truncated objects in crop
-            crop_truncated = np.where(((crop_bbxs[:, 0] < 0) |
-                                       (crop_bbxs[:, 1] < 0) |
-                                       (crop_bbxs[:, 2] > crop_width) |
-                                       (crop_bbxs[:, 3] > crop_height)), True, False)
-            # clip truncated objects
-            if np.any(crop_truncated):
-                crop_bbxs[:, [0, 2]] = np.clip(crop_bbxs[:, [0, 2]], 1, crop_width - 1)
-                crop_bbxs[:, [1, 3]] = np.clip(crop_bbxs[:, [1, 3]], 1, crop_height - 1)
+            if crop_bbxs is None:
+                continue
 
             # save image and xml:
             filename = '{}_{}'.format(j, i)  # save name as x_y format of top left corner of crop
@@ -296,6 +311,7 @@ class DataLoader(object):
                 # TODO: general form for all types
                 crop_image = exposure.rescale_intensity((crop_image // 256).astype('uint8'),
                                                         in_range='image', out_range='dtype')
+            # save to folder
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 skimage.io.imsave(os.path.join(save_folder, 'imgs', filename + '.jpeg'),

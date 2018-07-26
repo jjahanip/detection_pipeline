@@ -197,9 +197,9 @@ class JNet(object):
                     score = score[idx]
 
 
-                    from skimage import exposure
-                    show_image = exposure.rescale_intensity((batch_x[i, :, :, :]).astype('uint8'), in_range='image', out_range='dtype')
-                    visualize_bbxs(show_image, bbxs=box, save=True)
+                    # from skimage import exposure
+                    # show_image = exposure.rescale_intensity((batch_x[i, :, :, :]).astype('uint8'), in_range='image', out_range='dtype')
+                    # visualize_bbxs(show_image, bbxs=box, save=True)
 
                     box[:, [0, 2]] += corner[i][0]
                     box[:, [1, 3]] += corner[i][1]
@@ -221,8 +221,6 @@ class JNet(object):
         data.bbxs = data.bbxs[keep_idx, :]
         data.scores = data.scores[keep_idx]
 
-        # to be added: rotate crop
-
-        bbxs_image(os.path.join(self.conf.data_dir, 'bbxs_with_flip.tif'), data.bbxs, data.image.shape[:2][::-1])
-        center_image(os.path.join(self.conf.data_dir, 'centers_with_flip.tif'), data.centers, data.image.shape[:2][::-1])
+        bbxs_image(os.path.join(self.conf.data_dir, 'bbxs_detection.tif'), data.bbxs, data.image.shape[:2][::-1])
+        center_image(os.path.join(self.conf.data_dir, 'centers_detection.tif'), data.centers, data.image.shape[:2][::-1])
 
