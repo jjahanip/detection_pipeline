@@ -91,7 +91,13 @@ class DataLoader(object):
         self._scores = value
 
     def next_crop(self, crop_width=None, crop_height=None, crop_overlap=None):
-
+        '''
+        Generator for cropping large image based on given width, height and overlab
+        :param crop_width: width of crop
+        :param crop_height: height of crop
+        :param crop_overlap: overlap between crops
+        :yeild top left corner coordinates [x, y], cropped image
+        '''
         if crop_width is None:
             crop_width = self.width
         if crop_height is None:
@@ -126,7 +132,12 @@ class DataLoader(object):
         bar.finish()
 
     def get_bbxs_from_image(self, image, corner):
-
+        '''
+        crop from self.bbxs or generate bounding boxes for given image
+        :param image: image
+        :param corner: top left corner coordinates [x, y]
+        :retrun : np.array of found bounding boxes , np.array of truncation of objects
+        '''
         [j, i] = corner
         [image_width, image_height] = image.shape[:2][::-1]
 
@@ -180,7 +191,13 @@ class DataLoader(object):
 
     @staticmethod
     def remove_close_centers(centers, scores=None, radius=3):
-        """ returns array of True and Flase for centers to keep(True) remove(False) """
+        '''
+        find close centers and remove centers with radius < radius
+        :param centers: np.array of [centroid_x, centroid_y]
+        :param scores: np.array of probability of objectness
+        :param radius: int of distance threshold between objects
+        :return: array of True and Flase for centers to keep(True) remove(False)
+        '''
 
         # get groups of centers
         tree = spatial.cKDTree(centers)
@@ -215,10 +232,13 @@ class DataLoader(object):
 
     @staticmethod
     def nms(boxes, overlapThresh=.7):
-        """ returns array of True and Flase for centers to keep(True) remove(False) """
+        '''
 
-        # non_max_suppression_fast
-        # Malisiewicz et al.
+        :param boxes: np.array of [xmin, ymin, xmax, ymax]
+        :param overlapThresh: float intersection over union threshold
+        :return: array of True and Flase for centers to keep(True) remove(False)
+        '''
+        # non_max_suppression_fast Malisiewicz et al.
         # if there are no boxes, return an empty list
         if len(boxes) == 0:
             return []
@@ -273,6 +293,15 @@ class DataLoader(object):
         return pick
 
     def write_crops(self, save_folder, crop_width=None, crop_height=None, crop_overlap=None, adjust_hist=False):
+        '''
+
+        :param save_folder: folder path to save imgs and xmls folders
+        :param crop_width: width of crop
+        :param crop_height: height of crop
+        :param crop_overlap: overlap between crop
+        :param adjust_hist: boolean to adjust the histogram of image (rescale the intensity)
+        :return:
+        '''
 
         if crop_width is None:
             crop_width = self.width
@@ -331,6 +360,12 @@ class DataLoader(object):
         print('{} xmls in: {}'.format(idx - 1, save_folder + '/xmls'))
 
     def update_xmls(self, xml_dir, save_fname):
+        '''
+
+        :param xml_dir: path to the folder containing xml files
+        :param save_fname: save new bbxs to txt file
+        :return:
+        '''
 
         to_be_deleted = []
         to_be_added = []
