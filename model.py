@@ -7,6 +7,11 @@ import numpy as np
 import progressbar
 import tensorflow as tf
 
+# train
+from object_detection import model_hparams
+from object_detection import model_lib
+
+# test
 from google.protobuf import text_format
 from object_detection.protos import pipeline_pb2
 from object_detection.builders import model_builder
@@ -33,7 +38,8 @@ class JNet(object):
         self.input = None
         self.outputs = None
 
-        self.build_graph()
+        if conf.mode == 'test':
+            self.build_graph()
 
     def build_graph(self):
         # read pipeline config
@@ -106,7 +112,6 @@ class JNet(object):
         return out_dict
 
     def test(self, data):
-        # data = DataLoader(self.conf)
 
         config = tf.ConfigProto()
         config.gpu_options.allow_growth = True
@@ -129,7 +134,8 @@ class JNet(object):
                 except StopIteration:
                     iterate = False
 
-                # temp
+                # temp (for 16 bit image)
+                #TODO: check dtype
                 batch_x = batch_x / 256
 
                 out_org = self.safe_run(sess, feed_dict={self.input: batch_x}, output_tensor=self.outputs)
@@ -197,9 +203,9 @@ class JNet(object):
                     score = score[idx]
 
 
-                    # from skimage import exposure
-                    # show_image = exposure.rescale_intensity((batch_x[i, :, :, :]).astype('uint8'), in_range='image', out_range='dtype')
-                    # visualize_bbxs(show_image, bbxs=box, save=True)
+                    from skimage import exposure
+                    show_image = exposure.rescale_intensity((batch_x[i, :, :, :]).astype('uint8'), in_range='image', out_range='dtype')
+                    visualize_bbxs(show_image, bbxs=box, save=True)
 
                     box[:, [0, 2]] += corner[i][0]
                     box[:, [1, 3]] += corner[i][1]
@@ -224,3 +230,55 @@ class JNet(object):
         bbxs_image(os.path.join(self.conf.data_dir, 'bbxs_detection.tif'), data.bbxs, data.image.shape[:2][::-1])
         center_image(os.path.join(self.conf.data_dir, 'centers_detection.tif'), data.centers, data.image.shape[:2][::-1])
 
+    def train(self):
+
+        tf.logging.set_verbosity(tf.logging.INFO)
+
+        config = tf.estimator.RunConfig(model_dir=self.conf.model_dir)
+
+        train_and_eval_dict = model_lib.create_estimator_and_inputs(
+            run_config=config,
+            hparams=model_hparams.create_hparams(None),
+            pipeline_config_path=self.conf.pipeline_config_path,
+            train_steps=None,
+            eval_steps=None)
+        estimator = train_and_eval_dict['estimator']
+        train_input_fn = train_and_eval_dict['train_input_fn']
+        eval_input_fn = train_and_eval_dict['eval_input_fn']
+        eval_on_train_input_fn = train_and_eval_dict['eval_on_train_input_fn']
+        predict_input_fn = train_and_eval_dict['predict_input_fn']
+        train_steps = train_and_eval_dict['train_steps']
+        eval_steps = train_and_eval_dict['eval_steps']
+
+        train_spec, eval_specs = model_lib.create_train_and_eval_specs(
+            train_input_fn,
+            eval_input_fn,
+            eval_on_train_input_fn,
+            predict_input_fn,
+            train_steps,
+            eval_steps,
+            eval_on_train_data=False)
+
+        # Currently only a single Eval Spec is allowed.
+        tf.estimator.train_and_evaluate(estimator, train_spec, eval_specs[0])
+
+    def eval(self):
+
+        tf.logging.set_verbosity(tf.logging.INFO)
+
+        config = tf.estimator.RunConfig(model_dir=self.conf.model_dir)
+
+        train_and_eval_dict = model_lib.create_estimator_and_inputs(
+            run_config=config,
+            hparams=model_hparams.create_hparams(None),
+            pipeline_config_path=self.conf.pipeline_config_path,
+            train_steps=None,
+            eval_steps=None)
+        estimator = train_and_eval_dict['estimator']
+        eval_input_fn = train_and_eval_dict['eval_input_fn']
+        eval_steps = train_and_eval_dict['eval_steps']
+
+        name = 'validation_data'
+        input_fn = eval_input_fn
+
+        estimator.evaluate(input_fn, eval_steps, checkpoint_path=tf.train.latest_checkpoint(self.conf.model_dir))

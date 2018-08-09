@@ -25,7 +25,8 @@ class DataLoader(object):
         image_filenames = []
         for i in range(config.channel):
             filename = getattr(config, 'c{}'.format(i+1))
-            image_filenames.append(os.path.join(config.data_dir, filename))
+            if filename is not None:
+                image_filenames.append(os.path.join(config.data_dir, filename))
         self.image = read_image_from_filenames(image_filenames, to_ubyte=False)
 
         self.height = config.height
