@@ -47,15 +47,11 @@ Deep learning needs lots of samples (images in our case) to learn the  assigned 
 Moreover, fitting large images in the GPU memory is a challenging task.
 To overcome these issues, we have to create small crops from the large image.
 
-```write_crops.py``` read your large image ```data/input_data``` directory and creates small crops
- with size ```crop_size``` and save crops and xml files in ```imgs``` and ```xmls``` folders in ```save_dir``` folder.
- 
-Generate crops using automatic segmentation with the config file:
-```bash
-python write_crops.py --config_file=data/train/config.txt
-```
+In `config.py`, change to `write_crops` mode. and specify the necessary parameters in `# write_crops` section.
 
-This function will create 3 folders in your `save_dir` path. 
+This mode reads your large image in `data_dir` directory and creates small crops 
+with size `crop_width` and `crop_height` and saves crops and xml files in `imgs` and `xmls` folders
+ in `save_dir` folder.
 
 ![Alt text](files/3.png)
 
@@ -65,12 +61,12 @@ This function will create 3 folders in your `save_dir` path.
    ![Alt text](files/4.png)
 
 
- - You can adjust the intensity of the image __for visualization__ using ```adjust_image```.
+ - You can adjust the intensity of the image __for visualization__ using `adjust_image`.
     
     ![Alt-text](files/5.png)
 
  
-   - It will also create a new folder with intensity adjusted crops as ```adjusted_imgs```.
+   - It will also create a new folder with intensity adjusted crops as `adjusted_hist`.
  
       ![Alt-text](files/6.png)
  
@@ -81,12 +77,12 @@ If you generated the bounding boxes using automatic segmentation, it is suggeste
 
 ![Alt-text](files/7.gif)
 
-After you updated the bounding boxes, you can create a new txt file corresponding to the bounding box information of all of the cells in the original image:
+After you updated the bounding boxes, you can update the existing `bbxs.txt` with the new bounding boxes.
 
-```bash
-python update_bbxs.py --input_dir=data/train/xmls --output_file=/data/train/input_data/bbxs.txt
-```
-This will create a `bbxs.txt` file inside your `input_data` folder. You can use this file to generate the `tfrecord` file.
+In `config.py`, change to `update_xmls` mode. and specify the necessary parameters in `# update_xml` section.
+
+This will update your `bbxs_file` specified in `config.py`. You can use this file to generate the `tfrecord` file.
+
 ### 3. Generate tfrecord file from xmls and imgs
 After you created the crop images and corresponding xml files, you can generated the ```tfrecord``` file.
 ```tfrecord``` file is the input to your network.
@@ -154,10 +150,9 @@ and comment the evaluation lines:
 # }
 ```
 
-Now you can train your model:
-```bash
-python train.py --logtostderr --train_dir=training --pipeline_config_path=training/faster_rcnn_inception_resnet_v2_atrous_coco.config
-```
+Now you can train your model by switching to `train` mode in `config.py`. Don't forget to specify the correct path to
+the directory you want to save your model in `model_dir` and the path of your `pipeline_config_file` 
+in `pipeline_config_path`.
   
 ### 5. Export Inference Graph:
 After the training is done, you have to validate and test your network.```export_inference_graph``` freezes your model for testing.
@@ -189,9 +184,7 @@ __NOTE__: Make sure you have all 3 ```.index```,```.meta``` and ```.data``` file
 
 ### 7. Detect cells in large images:
 After you are done with training and you checked your network works well, you can run the network on large images.
-```bash
-python predict.py --input_dir=data/large_image --crop_size=500,500
-```
+Switch to `test` mode in `config.py` and specify desired parameters.
 
 # Probable Errors:
 
