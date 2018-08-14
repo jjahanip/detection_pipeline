@@ -27,7 +27,11 @@ class DataLoader(object):
             filename = getattr(config, 'c{}'.format(i+1))
             if filename is not None:
                 image_filenames.append(os.path.join(config.data_dir, filename))
-        self.image = read_image_from_filenames(image_filenames, to_ubyte=False)
+
+        if len(image_filenames) != 0:
+            self.image = read_image_from_filenames(image_filenames, to_ubyte=False)
+        else:
+            self.image = None
 
         self.height = config.height
         self.width = config.width
@@ -35,15 +39,21 @@ class DataLoader(object):
         self.overlap = config.overlap
 
         # read centers if exist
-        if os.path.isfile(os.path.join(config.data_dir, config.centers_file)):
-            centers_table = pd.read_csv(os.path.join(config.data_dir, config.centers_file), sep='\t')
+        if config.centers_file is not None:
+            centers_fname = os.path.join(os.path.join(config.data_dir, config.centers_file))
+            assert os.path.isfile(centers_fname), '{} not found!'.format(centers_fname)
+            # if file exist -> load
+            centers_table = pd.read_csv(centers_fname, sep='\t')
             self.centers = centers_table[['centriod_x', 'centriod_y']].values
         else:
             self._centers = None
 
         # read bbxs if exist
-        if os.path.isfile(os.path.join(config.data_dir, config.bbxs_file)):
-            bbxs_table = pd.read_csv(os.path.join(config.data_dir, config.bbxs_file), sep='\t')
+        if config.bbxs_file is not None:
+            bbxs_fname = os.path.join(os.path.join(config.data_dir, config.bbxs_file))
+            assert os.path.isfile(bbxs_fname), '{} not found!'.format(bbxs_fname)
+            # if file exist -> load
+            bbxs_table = pd.read_csv(bbxs_fname, sep='\t')
             self.bbxs = bbxs_table[['xmin', 'ymin', 'xmax', 'ymax']].values
         else:
             self._bbxs = None
@@ -335,7 +345,7 @@ class DataLoader(object):
                 continue
 
             # save image and xml:
-            filename = '{}_{}'.format(j, i)  # save name as x_y format of top left corner of crop
+            filename = '{:05d}_{:05d}'.format(j, i)  # save name as x_y format of top left corner of crop
             if adjust_hist:
                 # for 16bit images only.
                 # TODO: general form for all types
@@ -374,7 +384,7 @@ class DataLoader(object):
 
             # read file
             tree = ET.parse(os.path.join(xml_dir, filename))
-            corner = list(map(int, os.path.basename(filename).split('.')[0].split('_')))
+            corner = list(map(int, os.path.basename(filename).split('.')[0].split('_')))[::-1]
 
             size = tree.find('size')
             crop_width = int(size.find('width').text)
@@ -407,6 +417,7 @@ class DataLoader(object):
         self.bbxs = np.unique(self._bbxs, axis=0)
 
         self.save_bbxs(os.path.join(self.config.data_dir, save_fname))
+
         print('{} updated with new objects in {}'.format(self.config.bbxs_file, xml_dir))
         print('new bbxs saved in {}'.format(os.path.join(self.config.data_dir, save_fname)))
 

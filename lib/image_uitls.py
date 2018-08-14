@@ -101,7 +101,7 @@ def crop(images, topLeft, botRight, bbxs=None, centers=None):
     :param bbxs: np.array [xmin, ymin, xmax, ymax]
     return: cropped_image, cropped_centers, cropped_bbxs
     '''
-
+    #TODO: np.copy original images not to change original array
     cropped_images = images
 
     [x_start, y_start] = topLeft
