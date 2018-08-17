@@ -88,6 +88,7 @@ def visualize_bbxs(image, centers=None, bbxs=None, save=False, adjust_hist=False
                                            edgecolor="blue", fill=False))
     if save:
         fig.savefig('visualized_image.png', bbox_inches='tight')
+        plt.close()
     else:
         plt.show()
 
@@ -145,7 +146,7 @@ def crop(images, topLeft, botRight, bbxs=None, centers=None):
     return cropped_images
 
 
-def bbxs_image(file_name, bbxs, image_size, color='white'):
+def bbxs_image(file_name, bbxs, image_size, color='red'):
     '''
     Save RGB image with bounding boxes
     :param file_name: tifffile to be saved
@@ -163,7 +164,7 @@ def bbxs_image(file_name, bbxs, image_size, color='white'):
     box_pil.save(file_name)
 
 
-def center_image(file_name, centers, image_size, r=2, color='white'):
+def center_image(file_name, centers, image_size, r=2, color='red'):
     '''
     Save RGB image with centers
     :param file_name: tifffile to be saved

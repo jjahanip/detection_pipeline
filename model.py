@@ -53,9 +53,9 @@ class JNet(object):
         pipeline_config.model.faster_rcnn.image_resizer.fixed_shape_resizer.height = self.conf.height
         pipeline_config.model.faster_rcnn.image_resizer.fixed_shape_resizer.width = self.conf.width
 
-        pipeline_config.model.faster_rcnn.first_stage_max_proposals = self.conf.max_proposal
-        pipeline_config.model.faster_rcnn.second_stage_post_processing.batch_non_max_suppression.max_detections_per_class = self.conf.max_proposal
-        pipeline_config.model.faster_rcnn.second_stage_post_processing.batch_non_max_suppression.max_total_detections = self.conf.max_proposal
+        # pipeline_config.model.faster_rcnn.first_stage_max_proposals = self.conf.max_proposal
+        # pipeline_config.model.faster_rcnn.second_stage_post_processing.batch_non_max_suppression.max_detections_per_class = self.conf.max_proposal
+        # pipeline_config.model.faster_rcnn.second_stage_post_processing.batch_non_max_suppression.max_total_detections = self.conf.max_proposal
 
         if self.conf.mode == 'test':
             detection_model = model_builder.build(pipeline_config.model, is_training=False)
@@ -125,7 +125,7 @@ class JNet(object):
             while iterate:
 
                 # make np arrays for generator
-                batch_x = np.empty(shape=(self.batch_size, data.height, data.width, data.channel))
+                batch_x = np.empty(shape=(self.batch_size, data.height, data.width, 3))
                 corner = np.empty(shape=(self.batch_size, 2))
 
                 try:
@@ -136,7 +136,8 @@ class JNet(object):
 
                 # temp (for 16 bit image)
                 #TODO: check dtype
-                batch_x = batch_x / 256
+                if data.image.dtype == 'uint16':
+                    batch_x = batch_x / 256
 
                 out_org = self.safe_run(sess, feed_dict={self.input: batch_x}, output_tensor=self.outputs)
 
@@ -197,15 +198,16 @@ class JNet(object):
                     if not np.any(idx):     # if no bounding box after removing edge ones
                         continue
 
-                    # non-max-suppression
-                    idx = tf.image.non_max_suppression(np.array(box), score, len(box), iou_threshold=0.5).eval()
-                    box = box[idx, :]
-                    score = score[idx]
+                    #TODO: tensorflow version is slow... come up with alternative
+                    # # non-max-suppression
+                    # idx = tf.image.non_max_suppression(np.array(box), score, len(box), iou_threshold=0.5).eval()
+                    # box = box[idx, :]
+                    # score = score[idx]
 
 
-                    from skimage import exposure
-                    show_image = exposure.rescale_intensity((batch_x[i, :, :, :]).astype('uint8'), in_range='image', out_range='dtype')
-                    visualize_bbxs(show_image, bbxs=box, save=True)
+                    # from skimage import exposure
+                    # show_image = exposure.rescale_intensity((batch_x[i, :, :, :]).astype('uint8'), in_range='image', out_range='dtype')
+                    # visualize_bbxs(show_image, bbxs=box, save=True)
 
                     box[:, [0, 2]] += corner[i][0]
                     box[:, [1, 3]] += corner[i][1]
@@ -214,7 +216,7 @@ class JNet(object):
                     scores.append(score)
 
         # np.save(os.path.join(self.conf.data_dir, 'boxes.npy'), np.array(bbxs))
-        # np.save(os.path.join(self.conf.data_dir, 'boxes.npy'), np.array(scores))
+        # np.save(os.path.join(self.conf.data_dir, 'scores.npy'), np.array(scores))
 
         data.bbxs = np.concatenate(bbxs)
         data.scores = np.concatenate(scores)
@@ -227,6 +229,11 @@ class JNet(object):
         data.bbxs = data.bbxs[keep_idx, :]
         data.scores = data.scores[keep_idx]
 
+
+        np.save(os.path.join(self.conf.data_dir, 'boxes.npy'), data.bbxs)
+        np.save(os.path.join(self.conf.data_dir, 'scores.npy'), data.scores)
+
+        data.save_bbxs(os.path.join(self.conf.data_dir, 'bbxs_detection.txt'))
         bbxs_image(os.path.join(self.conf.data_dir, 'bbxs_detection.tif'), data.bbxs, data.image.shape[:2][::-1])
         center_image(os.path.join(self.conf.data_dir, 'centers_detection.tif'), data.centers, data.image.shape[:2][::-1])
 

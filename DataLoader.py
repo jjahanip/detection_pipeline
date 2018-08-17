@@ -384,7 +384,8 @@ class DataLoader(object):
 
             # read file
             tree = ET.parse(os.path.join(xml_dir, filename))
-            corner = list(map(int, os.path.basename(filename).split('.')[0].split('_')))[::-1]
+            #TODO: check [::-1] for old crops...
+            corner = list(map(int, os.path.basename(filename).split('.')[0].split('_')))
 
             size = tree.find('size')
             crop_width = int(size.find('width').text)
@@ -418,6 +419,9 @@ class DataLoader(object):
 
         self.save_bbxs(os.path.join(self.config.data_dir, save_fname))
 
+        from lib.image_uitls import bbxs_image, center_image
+        bbxs_image(os.path.join(self.config.data_dir, 'updated_bbxs.tif'), self.bbxs, self.image.shape[:2][::-1])
+        center_image(os.path.join(self.config.data_dir, 'centers_validation.tif'), self.centers, self.image.shape[:2][::-1])
         print('{} updated with new objects in {}'.format(self.config.bbxs_file, xml_dir))
         print('new bbxs saved in {}'.format(os.path.join(self.config.data_dir, save_fname)))
 
