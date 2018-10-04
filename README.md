@@ -8,19 +8,20 @@ Our goal is to perform large scale cell detection in an accurate and rubost mann
 
 ![Alt text](files/2.png)
 
-# Dependencies:
+# Requirements:
 
-* Tensorflow v1.4.* or later!
-
+* Tensorflow >= 1.4
 * [Protobuf](https://github.com/google/protobuf/releases)
+* [pycocotools](https://github.com/waleedka/coco)
+
+
 
 # Installation:
-#### 1. Download Protobuf from [here](https://github.com/google/protobuf/releases) and run the following command from ```lib``` directory:
+#### 1. Protobuf:
+Download executable from [here](https://github.com/google/protobuf/releases) and run the following command from ```lib``` directory:
 ``` bash
 protoc object_detection/protos/*.proto --python_out=.
 ```
-__*NOTE:__ Make sure the executable folder is added to your path variable:
-
 (__for Windows__):
 ```
 # From Protoc*/bin
@@ -33,8 +34,17 @@ SET PATH=%PATH%;%cd%
 export PATH=$PATH:`pwd`
 ```
 
-#### 2. Install TensorFlow library. Follow the instructions from [here](https://www.tensorflow.org/install/). 
-  
+#### 2. TensorFlow:
+Follow the instructions from [here](https://www.tensorflow.org/install/). 
+#### 3. Pycocotools
+(__for Linux and Mac__):
+1. Make sure you have `gcc > 6.x`.
+2. `git clone https://github.com/waleedka/coco.git`
+3. `cd coco/PythonAPI`
+4. `make`
+5. find your `site-packages` folder for your python and copy `pycocotools` folder there:
+    *  which python: `~/.conda/envs/tf/bin/python`
+    * `cp -r pycocotools ~/.conda/envs/tf/lib/python3.6/site-packages`
 #### 3. Install required libraries:
   ``` bash
   pip install -r requirments.txt
@@ -126,28 +136,23 @@ second_stage_post_processing {
 
 fine_tune_checkpoint: pretrained_models/faster_rcnn_inception_resnet_v2_atrous_coco_2018_01_28
 
-input_path: data/train.record
-label_map_path: data/nucleus_map.pbtxt
-```
+input_path: "data/train.record"
+label_map_path: "data/nucleus_map.pbtxt"
 
-and comment the evaluation lines:
-
-```vim
-# eval_config: {
-#   num_examples: 8000
-#   # Note: The below line limits the evaluation process to 10 evaluations.
-#   # Remove the below line to evaluate indefinitely.
-#   max_evals: 10
-# }
-#
-# eval_input_reader: {
-#   tf_record_input_reader {
-#   input_path: "PATH_TO_BE_CONFIGURED/mscoco_val.record"
-# }
-# label_map_path: "PATH_TO_BE_CONFIGURED/mscoco_label_map.pbtxt"
-# shuffle: false
-# num_readers: 1
-# }
+eval_config: {
+  num_examples: 8000
+  # Note: The below line limits the evaluation process to 10 evaluations.
+  # Remove the below line to evaluate indefinitely.
+  max_evals: 10
+}
+eval_input_reader: {
+  tf_record_input_reader {
+  input_path: "data/train.record"
+}
+label_map_path: "data/nucleus_map.pbtxt"
+shuffle: false
+num_readers: 1
+}
 ```
 
 Now you can train your model by switching to `train` mode in `config.py`. Don't forget to specify the correct path to
