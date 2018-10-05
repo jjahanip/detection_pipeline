@@ -5,6 +5,7 @@ import matplotlib.pylab as plt
 import matplotlib.patches as patches
 from PIL import Image
 import PIL.ImageDraw as ImageDraw
+from tifffile import imsave
 
 def imadjust(image, tol=[0.01, 0.99]):
     # img : input one-layer image (numpy array)
@@ -161,7 +162,10 @@ def bbxs_image(file_name, bbxs, image_size, color='red'):
         (left, right, top, bottom) = (xmin, xmax, ymin, ymax)
         box_draw.line([(left, top), (left, bottom), (right, bottom),
                        (right, top), (left, top)], width=2, fill=color)
-    box_pil.save(file_name)
+    try:
+        box_pil.save(file_name)
+    except:
+        imsave(file_name, np.array(box_pil), bigtiff=True)
 
 
 def center_image(file_name, centers, image_size, r=2, color='red'):
@@ -180,7 +184,10 @@ def center_image(file_name, centers, image_size, r=2, color='red'):
     for center in centers:
         center_draw.ellipse((center[0]-r, center[1]-r, center[0]+r, center[1]+r), fill=color)
 
-    image.save(file_name)
+    try:
+        image.save(file_name)
+    except:
+        imsave(file_name, np.array(image), bigtiff=True)
 
 
 def boundary_image(file_name, boundaries):
