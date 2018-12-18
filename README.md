@@ -233,3 +233,7 @@ Switch to `test` mode in `config.py` and specify desired parameters.
 4. If stucked with ```INFO:tensorflow:global_step/sec: 0``` you might have some issues with the ```.record``` data file. Double check your input data file.
 
 5. If stucked with ``` Dst tensor is not initialized ``` your GPU memory is full. Try ```nvidia-smi``` to monitor your GPU usage and try ```kill #process_id``` to kill the process that uses the memory.
+
+6. Error: `ModuleNotFoundError: No module named 'pycocotools'`
+
+   Solution: 
