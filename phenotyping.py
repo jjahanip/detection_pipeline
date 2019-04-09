@@ -1,4 +1,6 @@
 import os
+import time
+import numpy as np
 import pandas as pd
 from tifffile import imread, imwrite
 from lib.image_uitls import center_image
@@ -34,23 +36,68 @@ biomarkers = {'NeuN': 1535.85,
               'CNPase': 3726.25
               }
 
-if not os.path.exists(save_dir):
-    os.makedirs(save_dir)
-# get image info
-image = imread(image_sample)
-im_size = image.shape[::-1]
 
-# read bbxs file
-assert os.path.isfile(feature_table), '{} not found!'.format(feature_table)
-# if file exist -> load
-feature_table = pd.read_csv(feature_table, sep=',')
-centers = feature_table[['centroid_x', 'centroid_y']].values
-# ICE file requires different format, restore to original format
-centers[:, 1] = im_size[1] - centers[:, 1]
+def generate_centers_image():
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+    # get image info
+    image = imread(image_sample)
+    im_size = image.shape[::-1]
 
-for name, thresh in biomarkers.items():
-    bioM = feature_table[feature_table[name] >= thresh]
-    centers = bioM[['centroid_x', 'centroid_y']].values
+    # read bbxs file
+    assert os.path.isfile(feature_table), '{} not found!'.format(feature_table)
+    # if file exist -> load
+    table = pd.read_csv(feature_table, sep=',')
+    centers = table[['centroid_x', 'centroid_y']].values
     # ICE file requires different format, restore to original format
     centers[:, 1] = im_size[1] - centers[:, 1]
-    center_image(os.path.join(save_dir, name+'.tif'), centers, im_size, color='red')
+
+    for name, thresh in biomarkers.items():
+        bioM = table[table[name] >= thresh]
+        centers = bioM[['centroid_x', 'centroid_y']].values
+        # ICE file requires different format, restore to original format
+        centers[:, 1] = im_size[1] - centers[:, 1]
+        center_image(os.path.join(save_dir, name+'.tif'), centers, im_size, color='red')
+
+
+def generate_classification_table():
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+    # get image info
+    image = imread(image_sample)
+    im_size = image.shape[::-1]
+
+    # read bbxs file
+    assert os.path.isfile(feature_table), '{} not found!'.format(feature_table)
+    # if file exist -> load
+    table = pd.read_csv(feature_table, sep=',')
+    centers = table[['centroid_x', 'centroid_y']].values
+    # ICE file requires different format, restore to original format
+    centers[:, 1] = im_size[1] - centers[:, 1]
+
+    # threshold each biomarker based on defined dictionary
+    for name, thresh in biomarkers.items():
+        table[name] = np.where(table[name] >= thresh, 1, 0)
+
+    # ICE file requires different format, restore to original format
+    table['centroid_y'] = im_size[1] - table['centroid_y']
+
+    # get list of defined biomakers to remove the redundant ones
+    table = table[['centroid_x', 'centroid_y'] + [*biomarkers]]
+
+    # set index column header
+    table.index.name = 'ID'
+
+    # save classification table
+    table.to_csv(os.path.join(save_dir, 'classification_table.csv'))
+
+
+
+if __name__ == '__main__':
+
+    start = time.time()
+    # generate_centers_image()
+    generate_classification_table()
+    print('*' * 50)
+    print('*' * 50)
+    print('Pipeline finished successfully in {} seconds.'.format(time.time() - start))
