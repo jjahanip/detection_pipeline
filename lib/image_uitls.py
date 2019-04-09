@@ -7,6 +7,7 @@ from PIL import Image
 import PIL.ImageDraw as ImageDraw
 from tifffile import imsave
 
+
 def imadjust(image, tol=[0.01, 0.99]):
     # img : input one-layer image (numpy array)
     # tol : tolerance, from 0 to 1.
@@ -17,18 +18,19 @@ def imadjust(image, tol=[0.01, 0.99]):
         elif img.dtype == 'uint16':
             nbins = 65535
 
-        N = np.histogram(img, bins=nbins, range=[0, nbins])      # get histogram of image
-        cdf = np.cumsum(N[0]) / np.sum(N[0])                     # calculate cdf of image
-        ilow = np.argmax(cdf > tol[0]) / nbins                   # get lowest value of cdf (normalized)
-        ihigh = np.argmax(cdf >= tol[1]) / nbins                 # get heights value of cdf (normalized)
+        N = np.histogram(img, bins=nbins, range=[0, nbins])  # get histogram of image
+        cdf = np.cumsum(N[0]) / np.sum(N[0])  # calculate cdf of image
+        ilow = np.argmax(cdf > tol[0]) / nbins  # get lowest value of cdf (normalized)
+        ihigh = np.argmax(cdf >= tol[1]) / nbins  # get heights value of cdf (normalized)
 
-        lut = np.linspace(0, 1, num=nbins)                       # create convert map of values
-        lut[lut <= ilow] = ilow                                  # make sure they are larger than lowest value
-        lut[lut >= ihigh] = ihigh                                # make sure they are smaller than largest value
-        lut = (lut - ilow) / (ihigh - ilow)                      # normalize between 0 and 1
-        lut = np.round(lut * nbins).astype(img.dtype)            # convert to the original image's type
+        lut = np.linspace(0, 1, num=nbins)  # create convert map of values
+        lut[lut <= ilow] = ilow  # make sure they are larger than lowest value
+        lut[lut >= ihigh] = ihigh  # make sure they are smaller than largest value
+        lut = (lut - ilow) / (ihigh - ilow)  # normalize between 0 and 1
+        lut = np.round(lut * nbins).astype(img.dtype)  # convert to the original image's type
 
-        img_out = np.array([[lut[i] for i in row] for row in img])  # convert input image values based on conversion list
+        img_out = np.array(
+            [[lut[i] for i in row] for row in img])  # convert input image values based on conversion list
 
         return img_out
 
@@ -36,11 +38,11 @@ def imadjust(image, tol=[0.01, 0.99]):
         return adjust_single_channel(image, tol)
     elif len(image.shape) == 3:
         for i in range(3):
-            image[:,:,i] = adjust_single_channel(image[:, :, i], tol)
+            image[:, :, i] = adjust_single_channel(image[:, :, i], tol)
         return image
 
-def read_image_from_filenames(image_filenames, to_ubyte=True, adjust_hist=False):
 
+def read_image_from_filenames(image_filenames, to_ubyte=True, adjust_hist=False):
     # grayscale image (1 channel)
     if len(image_filenames) == 1:
         image = skimage.io.imread(image_filenames[0])  # read single channel image
@@ -93,6 +95,7 @@ def visualize_bbxs(image, centers=None, bbxs=None, save=False, adjust_hist=False
     else:
         plt.show()
 
+
 def crop(images, topLeft, botRight, bbxs=None, centers=None):
     '''
     crop sets of images, centers and bbxs
@@ -103,7 +106,7 @@ def crop(images, topLeft, botRight, bbxs=None, centers=None):
     :param bbxs: np.array [xmin, ymin, xmax, ymax]
     return: cropped_image, cropped_centers, cropped_bbxs
     '''
-    #TODO: np.copy original images not to change original array
+    # TODO: np.copy original images not to change original array
     cropped_images = images
 
     [x_start, y_start] = topLeft
@@ -147,17 +150,22 @@ def crop(images, topLeft, botRight, bbxs=None, centers=None):
     return cropped_images
 
 
-def bbxs_image(file_name, bbxs, image_size, color='red'):
+def bbxs_image(file_name, bbxs, image_size, color=None):
     '''
     Save RGB image with bounding boxes
     :param file_name: tifffile to be saved
     :param bbxs: np.array [xmin ymin xmax ymax]
     :param image_size: [width height]
+    :param color: color of bounding box 'red', 'blue', None: gray image
     :return:
     '''
 
-    box_pil = Image.new('RGB', image_size)
+    if color is None:
+        box_pil = Image.new('L', image_size)
+    else:
+        box_pil = Image.new('RGB', image_size)
     box_draw = ImageDraw.Draw(box_pil)
+
     for xmin, ymin, xmax, ymax in bbxs:
         (left, right, top, bottom) = (xmin, xmax, ymin, ymax)
         box_draw.line([(left, top), (left, bottom), (right, bottom),
@@ -168,21 +176,26 @@ def bbxs_image(file_name, bbxs, image_size, color='red'):
         imsave(file_name, np.array(box_pil), bigtiff=True)
 
 
-def center_image(file_name, centers, image_size, r=2, color='red'):
+def center_image(file_name, centers, image_size, r=2, color=None):
     '''
     Save RGB image with centers
     :param file_name: tifffile to be saved
     :param centers: np.array [centroid_x centroid_y]
     :param image_size: [width height]
     :param r : radius of center
+    :param color: color of center 'red', 'blue', None: gray image
+
     :return:
     '''
 
-    image = Image.new('RGB', image_size)
+    if color is None:
+        image = Image.new('L', image_size)
+    else:
+        image = Image.new('RGB', image_size)
     center_draw = ImageDraw.Draw(image)
 
     for center in centers:
-        center_draw.ellipse((center[0]-r, center[1]-r, center[0]+r, center[1]+r), fill=color)
+        center_draw.ellipse((center[0] - r, center[1] - r, center[0] + r, center[1] + r), fill=color)
 
     try:
         image.save(file_name)
