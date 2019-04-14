@@ -162,6 +162,7 @@ def bbxs_image(file_name, bbxs, image_size, color=None):
 
     if color is None:
         box_pil = Image.new('L', image_size)
+        color = 'white'
     else:
         box_pil = Image.new('RGB', image_size)
     box_draw = ImageDraw.Draw(box_pil)
@@ -190,6 +191,7 @@ def center_image(file_name, centers, image_size, r=2, color=None):
 
     if color is None:
         image = Image.new('L', image_size)
+        color = 'white'
     else:
         image = Image.new('RGB', image_size)
     center_draw = ImageDraw.Draw(image)
