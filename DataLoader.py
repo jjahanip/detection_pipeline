@@ -26,7 +26,7 @@ class DataLoader(object):
         for i in range(config.channel):
             filename = getattr(config, 'c{}'.format(i+1))
             if filename is not None:
-                image_filenames.append(os.path.join(config.data_dir, filename))
+                image_filenames.append(os.path.join(config.ipnut_dir, filename))
 
         if len(image_filenames) != 0:
             self.image = read_image_from_filenames(image_filenames, to_ubyte=False)
@@ -40,7 +40,7 @@ class DataLoader(object):
 
         # read centers if exist
         if config.centers_file is not None:
-            centers_fname = os.path.join(os.path.join(config.data_dir, config.centers_file))
+            centers_fname = os.path.join(os.path.join(config.input_dir, config.centers_file))
             assert os.path.isfile(centers_fname), '{} not found!'.format(centers_fname)
             # if file exist -> load
             centers_table = pd.read_csv(centers_fname, sep='\t')
@@ -50,7 +50,7 @@ class DataLoader(object):
 
         # read bbxs if exist
         if config.bbxs_file is not None:
-            bbxs_fname = os.path.join(os.path.join(config.data_dir, config.bbxs_file))
+            bbxs_fname = os.path.join(os.path.join(config.input_dir, config.bbxs_file))
             assert os.path.isfile(bbxs_fname), '{} not found!'.format(bbxs_fname)
             # if file exist -> load
             bbxs_table = pd.read_csv(bbxs_fname, sep='\t')
@@ -417,13 +417,13 @@ class DataLoader(object):
         self.bbxs = np.vstack([self._bbxs, to_be_added])
         self.bbxs = np.unique(self._bbxs, axis=0)
 
-        self.save_bbxs(os.path.join(self.config.data_dir, save_fname))
+        self.save_bbxs(os.path.join(self.config.input_dir, save_fname))
 
         from lib.image_uitls import bbxs_image, center_image
-        bbxs_image(os.path.join(self.config.data_dir, 'updated_bbxs.tif'), self.bbxs, self.image.shape[:2][::-1])
-        center_image(os.path.join(self.config.data_dir, 'centers_validation.tif'), self.centers, self.image.shape[:2][::-1])
+        bbxs_image(os.path.join(self.config.input_dir, 'updated_bbxs.tif'), self.bbxs, self.image.shape[:2][::-1])
+        center_image(os.path.join(self.config.input_dir, 'centers_validation.tif'), self.centers, self.image.shape[:2][::-1])
         print('{} updated with new objects in {}'.format(self.config.bbxs_file, xml_dir))
-        print('new bbxs saved in {}'.format(os.path.join(self.config.data_dir, save_fname)))
+        print('new bbxs saved in {}'.format(os.path.join(self.config.input_dir, save_fname)))
 
     def randomize(self):
         """ Randomizes the order of data samples and their corresponding labels"""

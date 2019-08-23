@@ -59,7 +59,7 @@ To overcome these issues, we have to create small crops from the large image.
 
 In `config.py`, change to `write_crops` mode. and specify the necessary parameters in `# write_crops` section.
 
-This mode reads your large image in `data_dir` directory and creates small crops 
+This mode reads your large image in `input_dir` directory and creates small crops 
 with size `crop_width` and `crop_height` and saves crops and xml files in `imgs` and `xmls` folders
  in `save_dir` folder.
 

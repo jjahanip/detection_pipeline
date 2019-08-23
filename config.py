@@ -5,7 +5,7 @@ flags = tf.app.flags
 flags.DEFINE_string('mode', 'test', 'train | test | eval | write_crops | update_xmls | create_tfrecord')
 
 # load model
-flags.DEFINE_string('pipeline_config_path', 'training/step1/pipeline_config.config', 'Path to detection config file')
+flags.DEFINE_string('pipeline_config_path', 'models/dapi/pipeline_config.config', 'Path to detection config file')
 
 
 # train
@@ -13,7 +13,7 @@ flags.DEFINE_string('model_dir', 'training/NeuN', 'Path to output model director
                                                   'where event and checkpoint files will be written.')
 
 # test
-flags.DEFINE_string('trained_checkpoint', 'training/step1/model.ckpt-113423', 'Path to trained checkpoint')
+flags.DEFINE_string('trained_checkpoint', 'models/dapi/model.ckpt-63896', 'Path to trained checkpoint')
 flags.DEFINE_integer('batch_size', 2, 'training batch size')
 flags.DEFINE_integer('max_proposal', 500, 'maximum proposal per image')
 flags.DEFINE_float('score_threshold', .4, 'Threshold of score of detection box')
@@ -25,9 +25,10 @@ flags.DEFINE_float('nms_iou', .6, 'intersection over union of bbxs for non max s
 flags.DEFINE_integer('close_centers_r', 5, 'Minimum distance between two centers')
 
 # data
-flags.DEFINE_string('data_dir', 'data/temp', 'Path to the directory of input data')
-flags.DEFINE_integer('channel', 2, 'Network input channel size')
-flags.DEFINE_string('c1', 'R2C0.tif', 'image 1 path')
+flags.DEFINE_string('input_dir', r'E:\jahandar\DashData\TBI\G3_BR#14_HC_11L', 'Path to the directory of input data')
+flags.DEFINE_string('output_dir', r'E:\jahandar\DashData\TBI\G3_BR#14_HC_11L\detection_results', 'Path to the directory to save results')
+flags.DEFINE_integer('channel', 1, 'Network input channel size')
+flags.DEFINE_string('c1', 'R2C1.tif', 'image 1 path')
 flags.DEFINE_string('c2', 'R2C1.tif', 'image 3 path')
 flags.DEFINE_string('c3', 'R2C3.tif', 'image 2 path')
 flags.DEFINE_string('bbxs_file', None, 'txt file name of bounding boxes')

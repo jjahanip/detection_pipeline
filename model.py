@@ -215,8 +215,8 @@ class JNet(object):
                     bbxs.append(box.astype(int))
                     scores.append(score)
 
-        # np.save(os.path.join(self.conf.data_dir, 'boxes.npy'), np.array(bbxs))
-        # np.save(os.path.join(self.conf.data_dir, 'scores.npy'), np.array(scores))
+        # np.save(os.path.join(self.conf.output_dir, 'boxes.npy'), np.array(bbxs))
+        # np.save(os.path.join(self.conf.output_dir, 'scores.npy'), np.array(scores))
 
         data.bbxs = np.concatenate(bbxs)
         data.scores = np.concatenate(scores)
@@ -229,13 +229,17 @@ class JNet(object):
         data.bbxs = data.bbxs[keep_idx, :]
         data.scores = data.scores[keep_idx]
 
+        # create output directory
+        if not os.path.exists(self.conf.output_dir):
+            os.makedirs(self.conf.output_dir)
 
-        np.save(os.path.join(self.conf.data_dir, 'boxes.npy'), data.bbxs)
-        np.save(os.path.join(self.conf.data_dir, 'scores.npy'), data.scores)
+        # save results in output_dir
+        np.save(os.path.join(self.conf.output_dir, 'boxes.npy'), data.bbxs)
+        np.save(os.path.join(self.conf.output_dir, 'scores.npy'), data.scores)
 
-        data.save_bbxs(os.path.join(self.conf.data_dir, 'bbxs_detection.txt'))
-        bbxs_image(os.path.join(self.conf.data_dir, 'bbxs_detection.tif'), data.bbxs, data.image.shape[:2][::-1])
-        center_image(os.path.join(self.conf.data_dir, 'centers_detection.tif'), data.centers, data.image.shape[:2][::-1])
+        data.save_bbxs(os.path.join(self.conf.output_dir, 'bbxs_detection.txt'))
+        bbxs_image(os.path.join(self.conf.output_dir, 'bbxs_detection.tif'), data.bbxs, data.image.shape[:2][::-1])
+        center_image(os.path.join(self.conf.output_dir, 'centers_detection.tif'), data.centers, data.image.shape[:2][::-1])
 
     def train(self):
 
