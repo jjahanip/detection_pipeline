@@ -45,6 +45,11 @@ Follow the instructions from [here](https://www.tensorflow.org/install/).
 5. find your `site-packages` folder for your python and copy `pycocotools` folder there:
     *  which python: `~/.conda/envs/tf/bin/python`
     * `cp -r pycocotools ~/.conda/envs/tf/lib/python3.6/site-packages`
+    
+(__for Windows__):
+``` bash
+pip install "git+https://github.com/philferriere/cocoapi.git#egg=pycocotools&subdirectory=PythonAPI"
+```
 #### 3. Install required libraries:
   ``` bash
   pip install -r requirments.txt
@@ -52,7 +57,7 @@ Follow the instructions from [here](https://www.tensorflow.org/install/).
 
 # Pipeline:
 
-### 1. Create small crops from large images and centers:
+### 1. Crop large images:
 Deep learning needs lots of samples (images in our case) to learn the  assigned task.
 Moreover, fitting large images in the GPU memory is a challenging task.
 To overcome these issues, we have to create small crops from the large image.
@@ -109,9 +114,9 @@ display_name: "Nucleus"
 ```
 
 ### 4. Train:
-1. Download your pretrained model from [here](https://github.com/tensorflow/models/blob/master/research/object_detection/g3doc/detection_model_zoo.md) and save it in folder ```pretrained_models ```.
+1. Download your pretrained model from [here](https://drive.google.com/open?id=1xvkkOij38YCO2_tVm5qAs4Xup1zoWrwC) and save it in folder ```models ```.
 
-2. create a __training__ folder to save the training model and parameters. Inside the __training__ folder copy the .config file from ```lib/object_detection/samples/configs/```.
+2. Inside the ```models``` folder copy the .config file from ```lib/object_detection/samples/configs/```.
 For example ```faster_rcnn_inception_resnet_v2_atrous_coco.config``` file.
 
 edit the following lines:
@@ -191,6 +196,17 @@ __NOTE__: Make sure you have all 3 ```.index```,```.meta``` and ```.data``` file
 After you are done with training and you checked your network works well, you can run the network on large images.
 Switch to `test` mode in `config.py` and specify desired parameters.
 
+If you do not have the trained models, download them from [here](https://drive.google.com/open?id=1xvkkOij38YCO2_tVm5qAs4Xup1zoWrwC).
+```bash
+python main.py \
+--mode=test \
+--pipeline_config_path=models/dapi/pipeline_config.config \
+--trained_checkpoint=models/dapi/model.ckpt \
+--input_dir=/path/to/folder/containing/images \
+--output_dir=/path/to/folder/saving/detection_Results \
+--channel=1 \
+--c1=R2C1.tif
+```
 # Probable Errors:
 
 1. If you faced this error:  
@@ -215,7 +231,7 @@ Switch to `test` mode in `config.py` and specify desired parameters.
 2. If your TensorFlow version is  < 1.5 you might have issues with object detection module. Go to commit 196d173 which is compatible with tf 1.4.1:
 
   ```bash
-  # from tensorflwo/models
+  # from tensorflow/models
   git checkout 196d173
   ```
 
@@ -230,10 +246,10 @@ Switch to `test` mode in `config.py` and specify desired parameters.
                                         [0] * num_boundaries))
   ```
   
-4. If stucked with ```INFO:tensorflow:global_step/sec: 0``` you might have some issues with the ```.record``` data file. Double check your input data file.
+4. If stuck with ```INFO:tensorflow:global_step/sec: 0``` you might have some issues with the ```.record``` data file. Double check your input data file.
 
-5. If stucked with ``` Dst tensor is not initialized ``` your GPU memory is full. Try ```nvidia-smi``` to monitor your GPU usage and try ```kill #process_id``` to kill the process that uses the memory.
+5. If stuck with ``` Dst tensor is not initialized ``` your GPU memory is full. Try ```nvidia-smi``` to monitor your GPU usage and try ```kill #process_id``` to kill the process that uses the memory.
 
 6. Error: `ModuleNotFoundError: No module named 'pycocotools'`
 
-   Solution: 
+   Solution: Go to installation section 3.
